@@ -6,9 +6,11 @@ import (
 	"log"
 	"os"
 
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 
+	httpHandler "parking-service/internal/delivery/http"
 	"parking-service/internal/repository"
 	"parking-service/internal/usecase"
 )
@@ -37,24 +39,27 @@ func NewApp() (*App, error) {
 		return nil, err
 	}
 
-	return &App{
-		db: db,
-	}, nil
+	return &App{db: db}, nil
 }
 
 func (a *App) Run() {
 	parkingRepo := repository.NewParkingRepository(a.db)
-	spotRepo := repository.NewSpotRepository(a.db)
-	tariffRepo := repository.NewTariffRepository(a.db)
 
 	parkingUsecase := usecase.NewParkingUsecase(parkingRepo)
-	spotUsecase := usecase.NewSpotUsecase(spotRepo)
-	tariffUsecase := usecase.NewTariffUsecase(tariffRepo)
 
-	fmt.Println("Parking Service started")
+	parkingHandler := httpHandler.NewParkingHandler(parkingUsecase)
+
+	router := gin.Default()
+
+	router.POST("/parkings", parkingHandler.CreateParking)
+	router.GET("/parkings/:id", parkingHandler.GetParking)
+	router.GET("/parkings", parkingHandler.GetAllParkings)
+
+	fmt.Println("Parking Service started on port 8080")
 	fmt.Println("Database connected successfully")
 
-	_ = parkingUsecase
-	_ = spotUsecase
-	_ = tariffUsecase
+	err := router.Run(":8080")
+	if err != nil {
+		log.Fatal(err)
+	}
 }
