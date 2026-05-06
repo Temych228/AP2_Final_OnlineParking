@@ -3,39 +3,67 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"time"
 )
 
 type Config struct {
-	AppPort string
+	AppPort     string
+	GRPCPort    string
+	MetricsPort string
 
-	DBHost     string
-	DBPort     string
-	DBUser     string
-	DBPassword string
-	DBName     string
+	DatabaseURL string
+	DBHost      string
+	DBPort      string
+	DBUser      string
+	DBPassword  string
+	DBName      string
+	DBSSLMode   string
 
-	RedisHost string
-	RedisPort string
+	RedisHost     string
+	RedisPort     string
+	RedisPassword string
+	RedisDB       int
+
+	CacheTTL time.Duration
 }
 
 func Load() (*Config, error) {
-	cfg := &Config{
-		AppPort:    getEnv("APP_PORT", "8081"),
-		DBHost:     getEnv("DB_HOST", "localhost"),
-		DBPort:     getEnv("DB_PORT", "5432"),
-		DBUser:     getEnv("DB_USER", "parking"),
-		DBPassword: getEnv("DB_PASSWORD", "parking"),
-		DBName:     getEnv("DB_NAME", "user_service"),
-		RedisHost:  getEnv("REDIS_HOST", "localhost"),
-		RedisPort:  getEnv("REDIS_PORT", "6379"),
+	cacheTTL, err := time.ParseDuration(getEnv("CACHE_TTL", "5m"))
+	if err != nil {
+		return nil, err
 	}
 
-	return cfg, nil
+	redisDB, err := strconv.Atoi(getEnv("REDIS_DB", "0"))
+	if err != nil {
+		return nil, err
+	}
+
+	return &Config{
+		AppPort:     getEnv("APP_PORT", "8081"),
+		GRPCPort:    getEnv("GRPC_PORT", "9091"),
+		MetricsPort: getEnv("METRICS_PORT", "9201"),
+
+		DatabaseURL: getEnv("DATABASE_URL", ""),
+		DBHost:      getEnv("DB_HOST", "localhost"),
+		DBPort:      getEnv("DB_PORT", "5432"),
+		DBUser:      getEnv("DB_USER", "postgres"),
+		DBPassword:  getEnv("DB_PASSWORD", ""),
+		DBName:      getEnv("DB_NAME", "postgres"),
+		DBSSLMode:   getEnv("DB_SSLMODE", "require"),
+
+		RedisHost:     getEnv("REDIS_HOST", "localhost"),
+		RedisPort:     getEnv("REDIS_PORT", "6379"),
+		RedisPassword: getEnv("REDIS_PASSWORD", ""),
+		RedisDB:       redisDB,
+
+		CacheTTL: cacheTTL,
+	}, nil
 }
 
 func getEnv(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
+	if v := os.Getenv(key); v != "" {
+		return v
 	}
 	return fallback
 }
@@ -44,10 +72,27 @@ func (c *Config) Address() string {
 	return fmt.Sprintf(":%s", c.AppPort)
 }
 
+func (c *Config) GRPCAddress() string {
+	return fmt.Sprintf(":%s", c.GRPCPort)
+}
+
+func (c *Config) MetricsAddress() string {
+	return fmt.Sprintf(":%s", c.MetricsPort)
+}
+
 func (c *Config) PostgresDSN() string {
+	if c.DatabaseURL != "" {
+		return c.DatabaseURL
+	}
+
 	return fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		c.DBUser, c.DBPassword, c.DBHost, c.DBPort, c.DBName,
+		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		c.DBUser,
+		c.DBPassword,
+		c.DBHost,
+		c.DBPort,
+		c.DBName,
+		c.DBSSLMode,
 	)
 }
 
