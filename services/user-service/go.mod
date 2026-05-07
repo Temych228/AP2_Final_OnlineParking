@@ -1,6 +1,6 @@
 module github.com/Temych228/AP2_Final_OnlineParking/services/user-service
 
-go 1.25.0
+go 1.26.2
 
 require (
 	github.com/Temych228/ap2_protos_go_final v1.0.1
