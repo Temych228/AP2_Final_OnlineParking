@@ -3,8 +3,8 @@ package usecase
 import (
 	"errors"
 
-	"parking-service/internal/domain"
-	"parking-service/internal/repository"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/domain"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/repository"
 )
 
 type SpotUsecase struct {

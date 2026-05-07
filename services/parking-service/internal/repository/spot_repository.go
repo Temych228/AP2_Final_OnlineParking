@@ -3,7 +3,7 @@ package repository
 import (
 	"database/sql"
 
-	"parking-service/internal/domain"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/domain"
 )
 
 type SpotRepository struct {

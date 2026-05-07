@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"parking-service/internal/usecase"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/usecase"
 )
 
 type ParkingHandler struct {
