@@ -1,0 +1,149 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: user-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${USER_DB_USER}
+      POSTGRES_PASSWORD: ${USER_DB_PASSWORD}
+      POSTGRES_DB: ${USER_DB_NAME}
+    ports:
+      - "${USER_DB_PORT_HOST:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - parking_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${USER_DB_USER} -d ${USER_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: user-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT_HOST:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - parking_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: parking-nats
+    restart: unless-stopped
+    command: ["-js"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    networks:
+      - parking_net
+
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./services/user-service/.env
+    environment:
+      APP_PORT: 8081
+      GRPC_PORT: 9091
+      METRICS_PORT: 9201
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    ports:
+      - "8081:8081"
+      - "9091:9091"
+      - "9201:9201"
+    networks:
+
+      - parking_net
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+    container_name: auth-service
+    restart: unless-stopped
+    depends_on:
+      - redis
+    env_file:
+      - ./services/auth-service/.env
+    environment:
+      APP_PORT: 8082
+      GRPC_PORT: 9092
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 1
+      JWT_SECRET: ${JWT_SECRET}
+      ACCESS_TOKEN_TTL: 15m
+      REFRESH_TOKEN_TTL: 720h
+      VERIFICATION_TOKEN_TTL: 24h
+      PASSWORD_RESET_TTL: 1h
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    ports:
+      - "8082:8082"
+      - "9092:9092"
+    networks:
+      - parking_net
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+    container_name: notification-service
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - nats
+    env_file:
+      - ./services/notification-service/.env
+    environment:
+      HTTP_PORT: 8083
+      GRPC_PORT: 9093
+      METRICS_PORT: 9203
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 2
+      NATS_URL: nats://nats:4222
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      FRONTEND_URL: ${FRONTEND_URL}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    ports:
+      - "8083:8083"
+      - "9093:9093"
+      - "9203:9203"
+    networks:
+      - parking_net
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  parking_net:
+    driver: bridge
