@@ -3,14 +3,11 @@ package main
 import (
 	"log"
 
-	"parking-service/internal/app"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/app"
 )
 
 func main() {
-	application, err := app.NewApp()
-	if err != nil {
+	if err := app.RunWithSignal(); err != nil {
 		log.Fatal(err)
 	}
-
-	application.Run()
 }

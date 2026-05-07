@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"parking-service/internal/domain"
-	"parking-service/internal/usecase"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/domain"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/usecase"
 )
 
 type SpotHandler struct {

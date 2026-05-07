@@ -1,33 +1,48 @@
 package app
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
+	"net"
+	"net/http"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
 
+	grpcHandler "github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/delivery/grpc"
+	httpHandler "github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/delivery/http"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/repository"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/usecase"
+
+	parkingv1 "github.com/Temych228/ap2_protos_go_final/parking/v1"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
-
-	httpHandler "parking-service/internal/delivery/http"
-	"parking-service/internal/repository"
-	"parking-service/internal/usecase"
+	"google.golang.org/grpc"
 )
 
 type App struct {
-	db *sql.DB
+	db         *sql.DB
+	httpServer *http.Server
+	grpcServer *grpc.Server
+	httpLn     net.Listener
+	grpcLn     net.Listener
 }
 
 func NewApp() (*App, error) {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println(".env file not found, using system env")
-	}
+	_ = godotenv.Load()
 
-	dbURL := os.Getenv("DB_PARKING")
+	dbURL := strings.TrimSpace(os.Getenv("DB_PARKING"))
 	if dbURL == "" {
-		return nil, fmt.Errorf("DB_PARKING is not set")
+		dbURL = strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	}
+	if dbURL == "" {
+		return nil, fmt.Errorf("DB_PARKING or DATABASE_URL is not set")
 	}
 
 	db, err := sql.Open("postgres", dbURL)
@@ -35,27 +50,154 @@ func NewApp() (*App, error) {
 		return nil, err
 	}
 
-	if err := db.Ping(); err != nil {
+	db.SetConnMaxLifetime(30 * time.Minute)
+	db.SetConnMaxIdleTime(5 * time.Minute)
+	db.SetMaxIdleConns(5)
+	db.SetMaxOpenConns(25)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
 		return nil, err
 	}
 
 	return &App{db: db}, nil
 }
 
-func (a *App) Run() {
+func (a *App) Run(ctx context.Context) error {
 	parkingRepo := repository.NewParkingRepository(a.db)
 	spotRepo := repository.NewSpotRepository(a.db)
 	tariffRepo := repository.NewTariffRepository(a.db)
 
-	parkingUsecase := usecase.NewParkingUsecase(parkingRepo)
-	spotUsecase := usecase.NewSpotUsecase(spotRepo)
-	tariffUsecase := usecase.NewTariffUsecase(tariffRepo)
+	parkingUC := usecase.NewParkingUsecase(parkingRepo)
+	spotUC := usecase.NewSpotUsecase(spotRepo)
+	tariffUC := usecase.NewTariffUsecase(tariffRepo)
 
-	parkingHandler := httpHandler.NewParkingHandler(parkingUsecase)
-	spotHandler := httpHandler.NewSpotHandler(spotUsecase)
-	tariffHandler := httpHandler.NewTariffHandler(tariffUsecase)
+	httpSrv, httpLn, err := buildHTTPServer(parkingUC, spotUC, tariffUC)
+	if err != nil {
+		return err
+	}
+	a.httpServer = httpSrv
+	a.httpLn = httpLn
 
-	router := gin.Default()
+	grpcSrv, grpcLn, err := buildGRPCServer(parkingUC, spotUC, tariffUC)
+	if err != nil {
+		_ = a.httpServer.Close()
+		_ = a.httpLn.Close()
+		return err
+	}
+	a.grpcServer = grpcSrv
+	a.grpcLn = grpcLn
+
+	errCh := make(chan error, 2)
+
+	go func() {
+		log.Printf("HTTP server started on %s", a.httpLn.Addr().String())
+		if err := a.httpServer.Serve(a.httpLn); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+	}()
+
+	go func() {
+		log.Printf("gRPC server started on %s", a.grpcLn.Addr().String())
+		if err := a.grpcServer.Serve(a.grpcLn); err != nil {
+			errCh <- err
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil
+	case err := <-errCh:
+		return err
+	}
+}
+
+func (a *App) Shutdown(ctx context.Context) error {
+	shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	var errs []string
+
+	if a.httpServer != nil {
+		if err := a.httpServer.Shutdown(shutdownCtx); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+
+	if a.grpcServer != nil {
+		stopped := make(chan struct{})
+		go func() {
+			a.grpcServer.GracefulStop()
+			close(stopped)
+		}()
+
+		select {
+		case <-stopped:
+		case <-shutdownCtx.Done():
+			a.grpcServer.Stop()
+		}
+	}
+
+	if a.httpLn != nil {
+		_ = a.httpLn.Close()
+	}
+
+	if a.grpcLn != nil {
+		_ = a.grpcLn.Close()
+	}
+
+	if a.db != nil {
+		_ = a.db.Close()
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf(strings.Join(errs, "; "))
+	}
+
+	return nil
+}
+
+func RunWithSignal() error {
+	app, err := NewApp()
+	if err != nil {
+		return err
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	runErr := make(chan error, 1)
+	go func() {
+		runErr <- app.Run(ctx)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return app.Shutdown(context.Background())
+	case err := <-runErr:
+		_ = app.Shutdown(context.Background())
+		return err
+	}
+}
+
+func buildHTTPServer(
+	parkingUC *usecase.ParkingUsecase,
+	spotUC *usecase.SpotUsecase,
+	tariffUC *usecase.TariffUsecase,
+) (*http.Server, net.Listener, error) {
+	parkingHandler := httpHandler.NewParkingHandler(parkingUC)
+	spotHandler := httpHandler.NewSpotHandler(spotUC)
+	tariffHandler := httpHandler.NewTariffHandler(tariffUC)
+
+	router := gin.New()
+	router.Use(gin.Recovery())
+
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 
 	router.POST("/parkings", parkingHandler.CreateParking)
 	router.GET("/parkings/:id", parkingHandler.GetParking)
@@ -74,11 +216,42 @@ func (a *App) Run() {
 	router.PATCH("/tariffs/:parking_id", tariffHandler.UpdateTariff)
 	router.GET("/tariffs/:parking_id/calculate", tariffHandler.CalculatePrice)
 
-	fmt.Println("Parking Service started on port 8080")
-	fmt.Println("Database connected successfully")
-
-	err := router.Run(":8080")
-	if err != nil {
-		log.Fatal(err)
+	port := strings.TrimSpace(os.Getenv("HTTP_PORT"))
+	if port == "" {
+		port = "8080"
 	}
+
+	ln, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	srv := &http.Server{
+		Handler: router,
+	}
+
+	return srv, ln, nil
+}
+
+func buildGRPCServer(
+	parkingUC *usecase.ParkingUsecase,
+	spotUC *usecase.SpotUsecase,
+	tariffUC *usecase.TariffUsecase,
+) (*grpc.Server, net.Listener, error) {
+	port := strings.TrimSpace(os.Getenv("GRPC_PORT"))
+	if port == "" {
+		port = "50051"
+	}
+
+	ln, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	grpcServer := grpc.NewServer()
+	grpcGRPCHandler := grpcHandler.NewParkingGRPCHandler(parkingUC, spotUC, tariffUC)
+
+	parkingv1.RegisterParkingServiceServer(grpcServer, grpcGRPCHandler)
+
+	return grpcServer, ln, nil
 }
