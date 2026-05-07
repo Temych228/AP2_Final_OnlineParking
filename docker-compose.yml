@@ -170,6 +170,41 @@ services:
     networks:
       - parking_net
 
+
+  parking-service:
+    build:
+      context: ./services/parking-service
+    container_name: parking-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    env_file:
+      - ./services/parking-service/.env
+    environment:
+      HTTP_PORT: 8082
+      GRPC_PORT: 9092
+      DB_PARKING: postgres://parking:parking@postgres:5432/parking?sslmode=disable
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 2
+      REDIS_PASSWORD:
+      NATS_URL: nats://nats:4222
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    ports:
+      - "8082:8082"
+      - "9092:9092"
+    networks:
+      - parking_net
+
+
+
 volumes:
   postgres_data:
   redis_data:
@@ -177,3 +212,4 @@ volumes:
 networks:
   parking_net:
     driver: bridge
+
