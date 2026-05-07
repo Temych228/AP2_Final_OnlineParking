@@ -3,7 +3,7 @@ module github.com/Temych228/AP2_Final_OnlineParking/services/auth-service
 go 1.26.2
 
 require (
-	github.com/Temych228/ap2_protos_go_final v1.0.1
+	github.com/Temych228/ap2_protos_go_final v1.0.3
 	github.com/gin-gonic/gin v1.12.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/jackc/pgx/v5 v5.9.2
