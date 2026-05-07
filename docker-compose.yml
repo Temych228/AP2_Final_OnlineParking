@@ -140,6 +140,36 @@ services:
     networks:
       - parking_net
 
+  booking-service:
+    build:
+      context: ./services/booking-service
+    container_name: booking-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    env_file:
+      - ./services/booking-service/.env
+    environment:
+      APP_PORT: 8084
+      GRPC_PORT: 9094
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 3
+      NATS_URL: nats://nats:4222
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    ports:
+      - "8084:8084"
+      - "9094:9094"
+    networks:
+      - parking_net
+
 volumes:
   postgres_data:
   redis_data:
