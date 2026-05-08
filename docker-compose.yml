@@ -203,6 +203,44 @@ services:
     networks:
       - parking_net
 
+  payment-service:
+    build:
+      context: ./services/payment-service
+    container_name: payment-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      booking-service:
+        condition: service_started
+      parking-service:
+        condition: service_started
+    env_file:
+      - ./services/payment-service/.env
+    environment:
+      HTTP_PORT: 8086
+      GRPC_PORT: 9096
+
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: parking
+      DB_PASSWORD: parking
+      DB_NAME: payment_db
+      DB_SSLMODE: disable
+
+      BOOKING_SERVICE_URL: http://booking-service:8084
+      PARKING_SERVICE_URL: http://parking-service:8082
+      NATS_URL: nats://nats:4222
+    ports:
+      - "8086:8086"
+      - "9096:9096"
+    networks:
+      - parking_net
+
+
+
 
 
 volumes:
