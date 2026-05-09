@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	AppPort     string
+	GRPCPort    string
 	MetricsPort string
 
 	DatabaseURL string
@@ -39,16 +40,18 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		AppPort:     getEnv("APP_PORT", "8082"),
-		MetricsPort: getEnv("METRICS_PORT", "9202"),
+		AppPort:     getEnv("APP_PORT", "8084"),
+		GRPCPort:    getEnv("GRPC_PORT", "9094"),
+		MetricsPort: getEnv("METRICS_PORT", "9204"),
 
 		DatabaseURL: getEnv("DATABASE_URL", ""),
-		DBHost:      getEnv("DB_HOST", "localhost"),
-		DBPort:      getEnv("DB_PORT", "5432"),
-		DBUser:      getEnv("DB_USER", "postgres"),
-		DBPassword:  getEnv("DB_PASSWORD", ""),
-		DBName:      getEnv("DB_NAME", "postgres"),
-		DBSSLMode:   getEnv("DB_SSLMODE", "disable"),
+
+		DBHost:     getEnv("DB_HOST", "localhost"),
+		DBPort:     getEnv("DB_PORT", "5432"),
+		DBUser:     getEnv("DB_USER", "postgres"),
+		DBPassword: getEnv("DB_PASSWORD", ""),
+		DBName:     getEnv("DB_NAME", "postgres"),
+		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
 
 		RedisHost:     getEnv("REDIS_HOST", "localhost"),
 		RedisPort:     getEnv("REDIS_PORT", "6379"),
@@ -68,6 +71,10 @@ func getEnv(key, fallback string) string {
 
 func (c *Config) Address() string {
 	return fmt.Sprintf(":%s", c.AppPort)
+}
+
+func (c *Config) GRPCAddress() string {
+	return fmt.Sprintf(":%s", c.GRPCPort)
 }
 
 func (c *Config) MetricsAddress() string {

@@ -2,24 +2,20 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net"
-	"net/http"
-	"strings"
 	"time"
-
-	httptransport "github.com/Temych228/AP2_Final_OnlineParking/services/booking-service/internal/transport/http"
 
 	"github.com/Temych228/AP2_Final_OnlineParking/services/booking-service/internal/config"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/booking-service/internal/repository"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/booking-service/internal/service"
+	grpcserver "github.com/Temych228/AP2_Final_OnlineParking/services/booking-service/internal/transport/grpc"
 
-	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
+	bookingv1 "github.com/Temych228/ap2_protos_go_final/booking/v1"
+
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/grpc"
 )
 
 type App struct {
@@ -28,68 +24,14 @@ type App struct {
 	db    *pgxpool.Pool
 	cache *redis.Client
 
-	httpServer    *http.Server
-	metricsServer *http.Server
-}
-
-func quoteIdentifier(name string) string {
-	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
-}
-
-func ensureDatabase(ctx context.Context, cfg *config.Config) error {
-	if cfg.DatabaseURL != "" || cfg.DBName == "postgres" {
-		return nil
-	}
-
-	// Use the configured user (which should be the superuser) for database creation
-	maintenanceDSN := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/postgres?sslmode=%s",
-		cfg.DBUser,
-		cfg.DBPassword,
-		cfg.DBHost,
-		cfg.DBPort,
-		cfg.DBSSLMode,
-	)
-
-	conn, err := pgx.Connect(ctx, maintenanceDSN)
-	if err != nil {
-		return err
-	}
-	defer conn.Close(ctx)
-
-	// Ensure the user has database creation privileges
-	_, err = conn.Exec(ctx, fmt.Sprintf("ALTER USER %s CREATEDB", quoteIdentifier(cfg.DBUser)))
-	if err != nil {
-		// Ignore error if already has privileges
-		log.Printf("Warning: could not grant CREATEDB to user: %v", err)
-	}
-
-	var exists bool
-	if err := conn.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = $1)", cfg.DBName).Scan(&exists); err != nil {
-		return err
-	}
-
-	if exists {
-		return nil
-	}
-
-	_, err = conn.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s", quoteIdentifier(cfg.DBName)))
-	if err != nil {
-		return err
-	}
-
-	// Grant privileges to the application user
-	_, err = conn.Exec(ctx, fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE %s TO %s", quoteIdentifier(cfg.DBName), quoteIdentifier(cfg.DBUser)))
-	return err
+	grpcServer   *grpc.Server
+	grpcListener net.Listener
 }
 
 func New(cfg *config.Config) (*App, error) {
 	ctx := context.Background()
 
-	if err := ensureDatabase(ctx, cfg); err != nil {
-		return nil, err
-	}
-
+	// DB
 	db, err := pgxpool.New(ctx, cfg.PostgresDSN())
 	if err != nil {
 		return nil, err
@@ -100,6 +42,7 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
+	// Redis
 	cache := redis.NewClient(&redis.Options{
 		Addr:     cfg.RedisAddr(),
 		Password: cfg.RedisPassword,
@@ -112,64 +55,43 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
+	// Repo → Service
 	repo := repository.NewBookingRepository(db, cache, cfg.CacheTTL)
 	svc := service.New(repo)
 
-	router := gin.New()
-	router.Use(gin.Recovery())
-
-	httpHandler := httptransport.New(svc)
-	httpHandler.Register(router)
-
-	httpServer := &http.Server{
-		Addr:    cfg.Address(),
-		Handler: router,
-	}
-
-	metricsServer := &http.Server{
-		Addr:    cfg.MetricsAddress(),
-		Handler: promhttp.Handler(),
-	}
+	// gRPC server
+	grpcSrv := grpc.NewServer()
+	bookingv1.RegisterBookingServiceServer(
+		grpcSrv,
+		grpcserver.New(svc),
+	)
 
 	return &App{
-		cfg:           cfg,
-		db:            db,
-		cache:         cache,
-		httpServer:    httpServer,
-		metricsServer: metricsServer,
+		cfg:        cfg,
+		db:         db,
+		cache:      cache,
+		grpcServer: grpcSrv,
 	}, nil
 }
 
 func (a *App) Run(ctx context.Context) error {
-	httpLis, err := net.Listen("tcp", a.cfg.Address())
+	grpcLis, err := net.Listen("tcp", ":"+a.cfg.GRPCPort)
 	if err != nil {
 		return err
 	}
-
-	metricsLis, err := net.Listen("tcp", a.cfg.MetricsAddress())
-	if err != nil {
-		_ = httpLis.Close()
-		return err
-	}
+	a.grpcListener = grpcLis
 
 	go func() {
-		<-ctx.Done()
-		_ = a.Shutdown(context.Background())
-	}()
-
-	go func() {
-		if err := a.httpServer.Serve(httpLis); err != nil && err != http.ErrServerClosed {
-			log.Printf("http server stopped: %v", err)
+		if err := a.grpcServer.Serve(grpcLis); err != nil {
+			log.Printf("booking grpc stopped: %v", err)
 		}
 	}()
 
-	go func() {
-		if err := a.metricsServer.Serve(metricsLis); err != nil && err != http.ErrServerClosed {
-			log.Printf("metrics server stopped: %v", err)
-		}
-	}()
+	log.Printf(
+		"booking-service started on grpc :%s",
+		a.cfg.GRPCPort,
+	)
 
-	log.Printf("booking-service started on %s, metrics on %s", a.cfg.Address(), a.cfg.MetricsAddress())
 	return nil
 }
 
@@ -177,12 +99,12 @@ func (a *App) Shutdown(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	if a.httpServer != nil {
-		_ = a.httpServer.Shutdown(shutdownCtx)
+	if a.grpcServer != nil {
+		a.grpcServer.GracefulStop()
 	}
 
-	if a.metricsServer != nil {
-		_ = a.metricsServer.Shutdown(shutdownCtx)
+	if a.grpcListener != nil {
+		_ = a.grpcListener.Close()
 	}
 
 	if a.cache != nil {
@@ -192,6 +114,8 @@ func (a *App) Shutdown(ctx context.Context) error {
 	if a.db != nil {
 		a.db.Close()
 	}
+
+	_ = shutdownCtx
 
 	return nil
 }
