@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -23,11 +24,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 )
 
 type App struct {
 	db         *sql.DB
+	cache      *redis.Client
 	httpServer *http.Server
 	grpcServer *grpc.Server
 	httpLn     net.Listener
@@ -67,7 +70,12 @@ func NewApp() (*App, error) {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	parkingRepo := repository.NewParkingRepository(a.db)
+	if err := a.connectRedis(); err != nil {
+		return err
+	}
+	defer a.cache.Close()
+
+	parkingRepo := repository.NewParkingRepository(a.db, a.cache, 5*time.Minute)
 	spotRepo := repository.NewSpotRepository(a.db)
 	tariffRepo := repository.NewTariffRepository(a.db)
 
@@ -149,6 +157,10 @@ func (a *App) Shutdown(ctx context.Context) error {
 		_ = a.grpcLn.Close()
 	}
 
+	if a.cache != nil {
+		_ = a.cache.Close()
+	}
+
 	if a.db != nil {
 		_ = a.db.Close()
 	}
@@ -181,6 +193,43 @@ func RunWithSignal() error {
 		_ = app.Shutdown(context.Background())
 		return err
 	}
+}
+
+func (a *App) connectRedis() error {
+	addr := strings.TrimSpace(os.Getenv("REDIS_ADDR"))
+	if addr == "" {
+		host := strings.TrimSpace(os.Getenv("REDIS_HOST"))
+		if host == "" {
+			host = "redis"
+		}
+		port := strings.TrimSpace(os.Getenv("REDIS_PORT"))
+		if port == "" {
+			port = "6379"
+		}
+		addr = host + ":" + port
+	}
+
+	dbIndex := 4
+	if raw := strings.TrimSpace(os.Getenv("REDIS_DB")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil {
+			dbIndex = v
+		}
+	}
+
+	cache := redis.NewClient(&redis.Options{
+		Addr:     addr,
+		Password: os.Getenv("REDIS_PASSWORD"),
+		DB:       dbIndex,
+	})
+
+	if err := cache.Ping(context.Background()).Err(); err != nil {
+		return err
+	}
+
+	a.cache = cache
+	log.Println("connected to Redis")
+
+	return nil
 }
 
 func buildHTTPServer(
@@ -218,7 +267,7 @@ func buildHTTPServer(
 
 	port := strings.TrimSpace(os.Getenv("HTTP_PORT"))
 	if port == "" {
-		port = "8080"
+		port = "8085"
 	}
 
 	ln, err := net.Listen("tcp", ":"+port)
@@ -240,7 +289,7 @@ func buildGRPCServer(
 ) (*grpc.Server, net.Listener, error) {
 	port := strings.TrimSpace(os.Getenv("GRPC_PORT"))
 	if port == "" {
-		port = "50051"
+		port = "9095"
 	}
 
 	ln, err := net.Listen("tcp", ":"+port)

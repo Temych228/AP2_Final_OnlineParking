@@ -19,6 +19,6 @@ RUN apk add --no-cache ca-certificates tzdata
 
 COPY --from=builder /app/parking-service .
 
-EXPOSE 8083 9093 9203
+EXPOSE 8085 9095
 
 CMD ["./parking-service"]

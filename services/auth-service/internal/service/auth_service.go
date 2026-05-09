@@ -54,6 +54,10 @@ func (s *AuthService) Register(ctx context.Context, input domain.RegisterInput) 
 		return "", err
 	}
 
+	/*
+		_ = s.publisher.PublishUserRegistered(userID, input.Email, input.FirstName, verificationToken)
+	*/
+
 	return userID, nil
 }
 

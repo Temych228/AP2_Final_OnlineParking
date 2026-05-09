@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"strings"
+	"unicode"
 )
 
 var (
@@ -28,6 +29,33 @@ type LoginInput struct {
 	Password string
 }
 
+func ValidatePassword(password string) error {
+	password = strings.TrimSpace(password)
+	if len(password) < 8 {
+		return ErrInvalidInput
+	}
+
+	var hasUpper, hasLower, hasDigit, hasSpecial bool
+	for _, r := range password {
+		switch {
+		case unicode.IsUpper(r):
+			hasUpper = true
+		case unicode.IsLower(r):
+			hasLower = true
+		case unicode.IsDigit(r):
+			hasDigit = true
+		case unicode.IsPunct(r) || unicode.IsSymbol(r):
+			hasSpecial = true
+		}
+	}
+
+	if !hasUpper || !hasLower || !hasDigit || !hasSpecial {
+		return ErrInvalidInput
+	}
+
+	return nil
+}
+
 func (i *RegisterInput) Validate() error {
 	i.Email = strings.TrimSpace(strings.ToLower(i.Email))
 	i.Password = strings.TrimSpace(i.Password)
@@ -39,11 +67,7 @@ func (i *RegisterInput) Validate() error {
 		return ErrInvalidInput
 	}
 
-	if len(i.Password) < 8 {
-		return ErrInvalidInput
-	}
-
-	return nil
+	return ValidatePassword(i.Password)
 }
 
 func (i *LoginInput) Validate() error {

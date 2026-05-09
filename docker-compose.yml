@@ -1,20 +1,21 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: user-postgres
+    container_name: parking-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${USER_DB_USER}
-      POSTGRES_PASSWORD: ${USER_DB_PASSWORD}
-      POSTGRES_DB: ${USER_DB_NAME}
+      POSTGRES_USER: parking
+      POSTGRES_PASSWORD: parking
+      POSTGRES_DB: postgres
     ports:
-      - "${USER_DB_PORT_HOST:-5432}:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - parking_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${USER_DB_USER} -d ${USER_DB_NAME}"]
+      test: [ "CMD-SHELL", "pg_isready -U parking" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -157,6 +158,12 @@ services:
     environment:
       APP_PORT: 8084
       GRPC_PORT: 9094
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: parking
+      DB_PASSWORD: parking
+      DB_NAME: booking_service
+      DB_SSLMODE: disable
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: 3
@@ -186,20 +193,17 @@ services:
     env_file:
       - ./services/parking-service/.env
     environment:
-      HTTP_PORT: 8082
-      GRPC_PORT: 9092
-      DB_PARKING: postgres://parking:parking@postgres:5432/parking?sslmode=disable
+      HTTP_PORT: 8085
+      GRPC_PORT: 9095
+      DB_PARKING: postgres://parking:parking@postgres:5432/parking_service?sslmode=disable
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_DB: 2
-      REDIS_PASSWORD:
+      REDIS_DB: 4
+      REDIS_PASSWORD: ""
       NATS_URL: nats://nats:4222
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
     ports:
-      - "8082:8082"
-      - "9092:9092"
+      - "8085:8085"
+      - "9095:9095"
     networks:
       - parking_net
 
@@ -210,6 +214,8 @@ services:
     restart: unless-stopped
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       nats:
         condition: service_started
@@ -222,26 +228,20 @@ services:
     environment:
       HTTP_PORT: 8086
       GRPC_PORT: 9096
-
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: parking
       DB_PASSWORD: parking
-      DB_NAME: payment_db
+      DB_NAME: payment_service
       DB_SSLMODE: disable
-
       BOOKING_SERVICE_URL: http://booking-service:8084
-      PARKING_SERVICE_URL: http://parking-service:8082
+      PARKING_SERVICE_URL: http://parking-service:8085
       NATS_URL: nats://nats:4222
     ports:
       - "8086:8086"
       - "9096:9096"
     networks:
       - parking_net
-
-
-
-
 
 volumes:
   postgres_data:
