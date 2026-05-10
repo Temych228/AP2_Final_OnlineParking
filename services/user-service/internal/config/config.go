@@ -20,6 +20,8 @@ type Config struct {
 	DBName      string
 	DBSSLMode   string
 
+	NATSURL string
+
 	RedisHost     string
 	RedisPort     string
 	RedisPassword string
@@ -51,6 +53,8 @@ func Load() (*Config, error) {
 		DBPassword:  getEnv("DB_PASSWORD", ""),
 		DBName:      getEnv("DB_NAME", "postgres"),
 		DBSSLMode:   getEnv("DB_SSLMODE", "require"),
+
+		NATSURL: getEnv("NATS_URL", "nats://nats:4222"),
 
 		RedisHost:     getEnv("REDIS_HOST", "localhost"),
 		RedisPort:     getEnv("REDIS_PORT", "6379"),

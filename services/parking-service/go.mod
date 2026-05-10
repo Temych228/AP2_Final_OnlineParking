@@ -3,7 +3,7 @@ module github.com/Temych228/AP2_Final_OnlineParking/services/parking-service
 go 1.26.2
 
 require (
-	github.com/Temych228/ap2_protos_go_final v1.0.4
+	github.com/Temych228/ap2_protos_go_final v1.1.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.12.3

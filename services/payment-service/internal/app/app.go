@@ -7,16 +7,17 @@ import (
 	"log"
 	"os"
 
-	"github.com/gin-gonic/gin"
-	"github.com/nats-io/nats.go"
-	"github.com/redis/go-redis/v9"
-
 	"payment-service/internal/config"
 	httpdelivery "payment-service/internal/delivery/http"
 	"payment-service/internal/integration"
 	"payment-service/internal/publisher"
 	"payment-service/internal/repository"
 	"payment-service/internal/service"
+
+	"github.com/gin-gonic/gin"
+	_ "github.com/lib/pq"
+	"github.com/nats-io/nats.go"
+	"github.com/redis/go-redis/v9"
 )
 
 type App struct {
@@ -52,19 +53,23 @@ func (a *App) Run() error {
 	}
 	defer a.cache.Close()
 
-	paymentRepo := repository.NewPaymentRepository(a.db)
+	Repo := repository.NewPaymentRepository(a.db)
 	bookingIntegration := integration.NewBookingIntegration(a.cfg.BookingServiceURL)
 	parkingIntegration := integration.NewParkingIntegration(a.cfg.ParkingServiceURL)
 	natsPublisher := publisher.NewNATSPublisher(a.nc)
 
 	paymentService := service.NewPaymentService(
-		paymentRepo,
+		Repo,
 		bookingIntegration,
 		parkingIntegration,
 		natsPublisher,
 	)
 	paymentService.SetCache(a.cache)
-
+	/*
+		if err := a.startGRPCServer(paymentService); err != nil {
+			return err
+		}
+	*/
 	router := gin.Default()
 	paymentHandler := httpdelivery.NewPaymentHandler(paymentService)
 	paymentHandler.RegisterRoutes(router)
@@ -140,3 +145,31 @@ func (a *App) runMigrations() error {
 
 	return nil
 }
+
+/*
+func (a *App) startGRPCServer(paymentService *service.PaymentService) error {
+	grpcAddr := ":" + a.cfg.GRPCPort
+
+	listener, err := net.Listen("tcp", grpcAddr)
+	if err != nil {
+		return fmt.Errorf("failed to listen on gRPC address %s: %w", grpcAddr, err)
+	}
+
+	grpcServer := grpc.NewServer()
+
+	paymentv1.RegisterPaymentServiceServer(
+		grpcServer,
+		grpcdelivery.New(paymentService),
+	)
+
+	go func() {
+		log.Printf("payment-service gRPC server is running on %s", grpcAddr)
+
+		if err := grpcServer.Serve(listener); err != nil {
+			log.Printf("payment-service gRPC server stopped: %v", err)
+		}
+	}()
+
+	return nil
+}
+*/

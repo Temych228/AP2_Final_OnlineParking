@@ -25,6 +25,10 @@ type Config struct {
 	RedisPassword string
 	RedisDB       int
 
+	NATSURL         string
+	UserGRPCAddr    string
+	ParkingGRPCAddr string
+
 	CacheTTL time.Duration
 }
 
@@ -57,6 +61,10 @@ func Load() (*Config, error) {
 		RedisPort:     getEnv("REDIS_PORT", "6379"),
 		RedisPassword: getEnv("REDIS_PASSWORD", ""),
 		RedisDB:       redisDB,
+
+		NATSURL:         getEnv("NATS_URL", "nats://nats:4222"),
+		UserGRPCAddr:    getEnv("USER_GRPC_ADDR", "user-service:9091"),
+		ParkingGRPCAddr: getEnv("PARKING_GRPC_ADDR", "parking-service:9095"),
 
 		CacheTTL: cacheTTL,
 	}, nil

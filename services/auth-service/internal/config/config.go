@@ -13,6 +13,8 @@ type Config struct {
 
 	DatabaseURL string
 
+	NATSURL string
+
 	RedisHost     string
 	RedisPort     string
 	RedisPassword string
@@ -60,6 +62,7 @@ func Load() (*Config, error) {
 		RedisPassword:    getEnv("REDIS_PASSWORD", ""),
 		RedisDB:          redisDB,
 		JWTSecret:        getEnv("JWT_SECRET", "change-me"),
+		NATSURL:          getEnv("NATS_URL", "nats://nats:4222"),
 		AccessTokenTTL:   accessTTL,
 		RefreshTokenTTL:  refreshTTL,
 		VerificationTTL:  verificationTTL,

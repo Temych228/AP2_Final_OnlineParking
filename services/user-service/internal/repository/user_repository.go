@@ -405,3 +405,38 @@ func argsForCount(role string) []any {
 	}
 	return []any{role}
 }
+
+func (r *UserRepository) CreateWithID(ctx context.Context, id string, input domain.CreateInput) (*domain.User, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	query := `
+		INSERT INTO users (id, email, first_name, last_name, phone, role)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (id) DO UPDATE
+		SET email = EXCLUDED.email,
+			first_name = EXCLUDED.first_name,
+			last_name = EXCLUDED.last_name,
+			phone = EXCLUDED.phone,
+			role = EXCLUDED.role,
+			updated_at = NOW()
+		RETURNING id, email, first_name, last_name, phone, role, is_verified, is_banned, COALESCE(ban_reason, ''), created_at, updated_at
+	`
+
+	row := tx.QueryRow(ctx, query, id, input.Email, input.FirstName, input.LastName, input.Phone, input.Role)
+
+	user, err := scanUser(row)
+	if err != nil {
+		return nil, fmt.Errorf("insert user with id: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit transaction: %w", err)
+	}
+
+	r.setCache(ctx, user)
+	return user, nil
+}

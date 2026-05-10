@@ -54,6 +54,9 @@ var (
 	ErrInvalidInput            = errors.New("invalid input")
 	ErrBookingConflict         = errors.New("booking time conflicts with an existing booking")
 	ErrInvalidStatusTransition = errors.New("invalid booking status transition")
+	ErrUserNotFound            = errors.New("user does not exist")
+	ErrParkingLotNotFound      = errors.New("parking lot does not exist")
+	ErrParkingSpotNotFound     = errors.New("parking spot does not exist")
 )
 
 func (s BookingStatus) IsValid() bool {

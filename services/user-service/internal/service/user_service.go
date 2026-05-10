@@ -70,3 +70,10 @@ func (s *UserService) GetUserStats(ctx context.Context, userID string) (int32, i
 	}
 	return 0, 0, 0, nil
 }
+
+func (s *UserService) CreateUserWithID(ctx context.Context, id string, input domain.CreateInput) (*domain.User, error) {
+	if err := input.Validate(); err != nil {
+		return nil, err
+	}
+	return s.repo.CreateWithID(ctx, id, input)
+}

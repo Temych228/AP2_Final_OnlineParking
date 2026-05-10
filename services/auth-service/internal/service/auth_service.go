@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"time"
 
+	"github.com/Temych228/AP2_Final_OnlineParking/services/auth-service/internal/publisher"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
@@ -16,8 +17,9 @@ import (
 )
 
 type AuthService struct {
-	cfg  *config.Config
-	repo *repository.AuthRepository
+	cfg       *config.Config
+	repo      *repository.AuthRepository
+	publisher *publisher.NATSPublisher
 }
 
 type TokenPair struct {
@@ -28,8 +30,8 @@ type TokenPair struct {
 	Email        string
 }
 
-func New(cfg *config.Config, repo *repository.AuthRepository) *AuthService {
-	return &AuthService{cfg: cfg, repo: repo}
+func New(cfg *config.Config, repo *repository.AuthRepository, pub *publisher.NATSPublisher) *AuthService {
+	return &AuthService{cfg: cfg, repo: repo, publisher: pub}
 }
 
 func (s *AuthService) Register(ctx context.Context, input domain.RegisterInput) (string, error) {
@@ -54,9 +56,11 @@ func (s *AuthService) Register(ctx context.Context, input domain.RegisterInput) 
 		return "", err
 	}
 
-	/*
-		_ = s.publisher.PublishUserRegistered(userID, input.Email, input.FirstName, verificationToken)
-	*/
+	if s.publisher != nil {
+		if err := s.publisher.PublishUserRegistered(userID, input.Email, input.FirstName, input.LastName, input.Phone, token); err != nil {
+			return "", err
+		}
+	}
 
 	return userID, nil
 }

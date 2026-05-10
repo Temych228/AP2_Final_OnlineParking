@@ -8,11 +8,13 @@ import (
 	"time"
 
 	"github.com/Temych228/AP2_Final_OnlineParking/services/auth-service/internal/config"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/auth-service/internal/publisher"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/auth-service/internal/repository"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/auth-service/internal/service"
 	grpcserver "github.com/Temych228/AP2_Final_OnlineParking/services/auth-service/internal/transport/grpc"
 	authv1 "github.com/Temych228/ap2_protos_go_final/auth/v1"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 )
@@ -22,6 +24,8 @@ type App struct {
 
 	db    *pgxpool.Pool
 	cache *redis.Client
+
+	nats *nats.Conn
 
 	grpcServer   *grpc.Server
 	grpcListener net.Listener
@@ -53,8 +57,16 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
+	nc, err := nats.Connect(cfg.NATSURL)
+	if err != nil {
+		db.Close()
+		_ = cache.Close()
+		return nil, err
+	}
+
 	repo := repository.New(db, cache)
-	svc := service.New(cfg, repo)
+	pub := publisher.New(nc)
+	svc := service.New(cfg, repo, pub)
 
 	grpcSrv := grpc.NewServer()
 	authv1.RegisterAuthServiceServer(grpcSrv, grpcserver.New(svc))
@@ -71,6 +83,7 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	return &App{
+		nats:       nc,
 		cfg:        cfg,
 		db:         db,
 		cache:      cache,
@@ -124,6 +137,10 @@ func (a *App) Shutdown(ctx context.Context) error {
 
 	if a.db != nil {
 		a.db.Close()
+	}
+
+	if a.nats != nil {
+		a.nats.Close()
 	}
 
 	return nil

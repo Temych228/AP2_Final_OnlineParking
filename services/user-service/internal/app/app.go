@@ -2,17 +2,19 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net"
 	"net/http"
 	"time"
 
-	grpcserver "github.com/Temych228/AP2_Final_OnlineParking/services/user-service/internal/transport/grpc"
-	httptransport "github.com/Temych228/AP2_Final_OnlineParking/services/user-service/internal/transport/http"
-
 	"github.com/Temych228/AP2_Final_OnlineParking/services/user-service/internal/config"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/user-service/internal/domain"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/user-service/internal/repository"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/user-service/internal/service"
+	grpcserver "github.com/Temych228/AP2_Final_OnlineParking/services/user-service/internal/transport/grpc"
+	httptransport "github.com/Temych228/AP2_Final_OnlineParking/services/user-service/internal/transport/http"
+	"github.com/nats-io/nats.go"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -32,8 +34,20 @@ type App struct {
 	grpcServer   *grpc.Server
 	grpcListener net.Listener
 
+	nats *nats.Conn
+
 	httpServer    *http.Server
 	metricsServer *http.Server
+}
+
+type userRegisteredEvent struct {
+	EventID           string `json:"event_id"`
+	UserID            string `json:"user_id"`
+	UserEmail         string `json:"user_email"`
+	FirstName         string `json:"first_name"`
+	LastName          string `json:"last_name"`
+	Phone             string `json:"phone"`
+	VerificationToken string `json:"verification_token"`
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -55,6 +69,13 @@ func New(cfg *config.Config) (*App, error) {
 		DB:       cfg.RedisDB,
 	})
 
+	nc, err := nats.Connect(cfg.NATSURL)
+	if err != nil {
+		db.Close()
+		_ = cache.Close()
+		return nil, err
+	}
+
 	if err := cache.Ping(ctx).Err(); err != nil {
 		db.Close()
 		_ = cache.Close()
@@ -63,6 +84,13 @@ func New(cfg *config.Config) (*App, error) {
 
 	repo := repository.NewUserRepository(db, cache, cfg.CacheTTL)
 	svc := service.New(repo)
+
+	if err := subscribeUserRegistered(nc, svc); err != nil {
+		nc.Close()
+		db.Close()
+		_ = cache.Close()
+		return nil, err
+	}
 
 	grpcSrv := grpc.NewServer()
 	userv1.RegisterUserServiceServer(grpcSrv, grpcserver.New(svc))
@@ -90,6 +118,7 @@ func New(cfg *config.Config) (*App, error) {
 		grpcServer:    grpcSrv,
 		httpServer:    httpServer,
 		metricsServer: metricsServer,
+		nats:          nc,
 	}, nil
 }
 
@@ -163,5 +192,34 @@ func (a *App) Shutdown(ctx context.Context) error {
 		a.db.Close()
 	}
 
+	if a.nats != nil {
+		a.nats.Close()
+	}
+
 	return nil
+}
+
+func subscribeUserRegistered(nc *nats.Conn, svc *service.UserService) error {
+	_, err := nc.Subscribe("parking.user.registered", func(msg *nats.Msg) {
+		var ev userRegisteredEvent
+		if err := json.Unmarshal(msg.Data, &ev); err != nil {
+			log.Printf("user-service nats unmarshal error: %v", err)
+			return
+		}
+
+		_, err := svc.CreateUserWithID(context.Background(), ev.UserID, domain.CreateInput{
+			Email:     ev.UserEmail,
+			FirstName: ev.FirstName,
+			LastName:  ev.LastName,
+			Phone:     ev.Phone,
+			Role:      domain.RoleUser,
+		})
+		if err != nil {
+			log.Printf("user-service create profile error: %v", err)
+		}
+	})
+	if err != nil {
+		return err
+	}
+	return nc.Flush()
 }

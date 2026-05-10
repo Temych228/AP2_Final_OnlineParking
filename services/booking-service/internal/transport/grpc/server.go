@@ -199,6 +199,10 @@ func mapError(err error) error {
 	case errors.Is(err, domain.ErrBookingConflict),
 		errors.Is(err, domain.ErrInvalidStatusTransition):
 		return status.Error(codes.FailedPrecondition, err.Error())
+	case errors.Is(err, domain.ErrUserNotFound),
+		errors.Is(err, domain.ErrParkingLotNotFound),
+		errors.Is(err, domain.ErrParkingSpotNotFound):
+		return status.Error(codes.InvalidArgument, err.Error())
 	default:
 		return status.Error(codes.Internal, err.Error())
 	}

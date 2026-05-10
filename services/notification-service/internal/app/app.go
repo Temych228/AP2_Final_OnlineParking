@@ -113,11 +113,10 @@ func New(cfg *config.Config) (*App, error) {
 
 func (a *App) subscribeNATS() error {
 	subjects := []string{
-		"parking.booking.confirmed",
-		"parking.payment.success",
-		"parking.booking.cancelled",
-		"parking.user.registered",
-		"parking.auth.password_reset",
+		"parking.user.*",
+		"parking.booking.*",
+		"parking.payment.*",
+		"parking.auth.*",
 	}
 
 	for _, subject := range subjects {

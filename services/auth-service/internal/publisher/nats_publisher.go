@@ -19,22 +19,28 @@ type UserRegisteredEvent struct {
 	UserID            string    `json:"user_id"`
 	UserEmail         string    `json:"user_email"`
 	FirstName         string    `json:"first_name"`
+	LastName          string    `json:"last_name"`
+	Phone             string    `json:"phone"`
 	VerificationToken string    `json:"verification_token"`
 	OccurredAt        time.Time `json:"occurred_at"`
 }
 
-func (p *NATSPublisher) PublishUserRegistered(userID, email, firstName, verifyToken string) error {
+func (p *NATSPublisher) PublishUserRegistered(userID, email, firstName, lastName, phone, verifyToken string) error {
 	event := UserRegisteredEvent{
 		EventID:           uuid.NewString(),
 		UserID:            userID,
 		UserEmail:         email,
 		FirstName:         firstName,
+		LastName:          lastName,
+		Phone:             phone,
 		VerificationToken: verifyToken,
 		OccurredAt:        time.Now(),
 	}
+
 	data, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
+
 	return p.conn.Publish(SubjectUserRegistered, data)
 }
