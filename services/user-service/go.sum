@@ -1,5 +1,6 @@
 github.com/Temych228/ap2_protos_go_final v1.0.3 h1:ZxQqPKTvQi+O1ceos9ZURu80D2A8mNzwdDx8Vbxxc6k=
 github.com/Temych228/ap2_protos_go_final v1.0.3/go.mod h1:zGdo6kc/FdasCBk87mPkc6swkwMSfPHmmn1Tzx0o9TM=
+github.com/Temych228/ap2_protos_go_final v1.1.0 h1:5aXwZQEUUgbjHTwOifjsNoiZQa0ZI+2kFcIdZt5oynQ=
 github.com/Temych228/ap2_protos_go_final v1.1.0/go.mod h1:BuvXQdPSMfDlXEVLehLplfWPsvbEk0kYvQyoCG1FE60=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
