@@ -80,8 +80,8 @@ func (a *App) Run(ctx context.Context) error {
 	tariffRepo := repository.NewTariffRepository(a.db)
 
 	parkingUC := usecase.NewParkingUsecase(parkingRepo)
-	spotUC := usecase.NewSpotUsecase(spotRepo)
-	tariffUC := usecase.NewTariffUsecase(tariffRepo)
+	spotUC := usecase.NewSpotUsecase(spotRepo, parkingRepo)
+	tariffUC := usecase.NewTariffUsecase(tariffRepo, parkingRepo)
 
 	httpSrv, httpLn, err := buildHTTPServer(parkingUC, spotUC, tariffUC)
 	if err != nil {

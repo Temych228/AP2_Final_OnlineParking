@@ -2,27 +2,59 @@ package usecase
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/domain"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/repository"
 )
 
 type SpotUsecase struct {
-	spotRepo *repository.SpotRepository
+	spotRepo    *repository.SpotRepository
+	parkingRepo *repository.ParkingRepository
 }
 
-func NewSpotUsecase(spotRepo *repository.SpotRepository) *SpotUsecase {
-	return &SpotUsecase{spotRepo: spotRepo}
+func NewSpotUsecase(
+	spotRepo *repository.SpotRepository,
+	parkingRepo *repository.ParkingRepository,
+) *SpotUsecase {
+	return &SpotUsecase{
+		spotRepo:    spotRepo,
+		parkingRepo: parkingRepo,
+	}
 }
 
 func (u *SpotUsecase) CreateSpot(parkingID int64, number string) (*domain.Spot, error) {
+	number = strings.TrimSpace(number)
+
+	if parkingID <= 0 {
+		return nil, errors.New("parking_id is required")
+	}
+
+	if number == "" {
+		return nil, errors.New("spot number is required")
+	}
+
+	parking, err := u.parkingRepo.GetByID(parkingID)
+	if err != nil {
+		return nil, errors.New("parking not found")
+	}
+
+	currentCount, err := u.spotRepo.CountByParkingID(parkingID)
+	if err != nil {
+		return nil, err
+	}
+
+	if currentCount >= parking.TotalSpots {
+		return nil, errors.New("parking spot limit reached")
+	}
+
 	spot := &domain.Spot{
 		ParkingID: parkingID,
 		Number:    number,
 		Status:    domain.StatusAvailable,
 	}
 
-	err := u.spotRepo.Create(spot)
+	err = u.spotRepo.Create(spot)
 	if err != nil {
 		return nil, err
 	}

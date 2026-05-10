@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/usecase"
+	"strconv"
 	"strings"
 
 	parkingv1 "github.com/Temych228/ap2_protos_go_final/parking/v1"
@@ -482,4 +483,62 @@ func NewParkingGRPCHandler(
 		spotUC:    spotUC,
 		tariffUC:  tariffUC,
 	}
+}
+
+func (h *ParkingGRPCHandler) GetParkingLot(ctx context.Context, req *parkingv1.GetParkingLotRequest) (*parkingv1.GetParkingLotResponse, error) {
+	if strings.TrimSpace(req.GetParkingLotId()) == "" {
+		return nil, status.Error(codes.InvalidArgument, "parking_lot_id is required")
+	}
+
+	id, err := strconv.ParseInt(req.GetParkingLotId(), 10, 64)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid parking_lot_id")
+	}
+
+	parking, err := h.parkingUC.GetParking(id)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "parking lot not found")
+	}
+
+	return &parkingv1.GetParkingLotResponse{
+		ParkingLot: &parkingv1.ParkingLot{
+			Id:             strconv.FormatInt(parking.ID, 10),
+			Name:           parking.Name,
+			Address:        parking.Address,
+			TotalSpots:     int32(parking.TotalSpots),
+			AvailableSpots: int32(parking.TotalSpots),
+			PricePerHour:   0,
+			IsActive:       true,
+		},
+	}, nil
+}
+
+func (h *ParkingGRPCHandler) GetParkingSpot(ctx context.Context, req *parkingv1.GetParkingSpotRequest) (*parkingv1.GetParkingSpotResponse, error) {
+	if strings.TrimSpace(req.GetParkingSpotId()) == "" {
+		return nil, status.Error(codes.InvalidArgument, "parking_spot_id is required")
+	}
+
+	id, err := strconv.ParseInt(req.GetParkingSpotId(), 10, 64)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid parking_spot_id")
+	}
+
+	spot, err := h.spotUC.GetSpot(id)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "parking spot not found")
+	}
+
+	return &parkingv1.GetParkingSpotResponse{
+		ParkingSpot: &parkingv1.ParkingSpot{
+			Id:           strconv.FormatInt(spot.ID, 10),
+			ParkingLotId: strconv.FormatInt(spot.ParkingID, 10),
+			Code:         spot.Number,
+			Level:        "1",
+			SpotType:     "standard",
+			VehicleType:  "car",
+			IsActive:     true,
+			IsOccupied:   string(spot.Status) == "OCCUPIED",
+			IsReserved:   string(spot.Status) == "RESERVED",
+		},
+	}, nil
 }

@@ -102,3 +102,14 @@ func (r *SpotRepository) Delete(id int64) error {
 	_, err := r.db.Exec(`DELETE FROM spots WHERE id = $1`, id)
 	return err
 }
+
+func (r *SpotRepository) CountByParkingID(parkingID int64) (int, error) {
+	var count int
+
+	err := r.db.QueryRow(
+		`SELECT COUNT(*) FROM spots WHERE parking_id = $1`,
+		parkingID,
+	).Scan(&count)
+
+	return count, err
+}
