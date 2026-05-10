@@ -1,20 +1,17 @@
 package app
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
-	"net"
 	"os"
 
-	paymentv1 "github.com/Temych228/ap2_protos_go_final/payment/v1"
 	"github.com/gin-gonic/gin"
-	_ "github.com/lib/pq"
 	"github.com/nats-io/nats.go"
-	"google.golang.org/grpc"
+	"github.com/redis/go-redis/v9"
 
 	"payment-service/internal/config"
-	grpcdelivery "payment-service/internal/delivery/grpc"
 	httpdelivery "payment-service/internal/delivery/http"
 	"payment-service/internal/integration"
 	"payment-service/internal/publisher"
@@ -23,9 +20,10 @@ import (
 )
 
 type App struct {
-	cfg *config.Config
-	db  *sql.DB
-	nc  *nats.Conn
+	cfg   *config.Config
+	db    *sql.DB
+	nc    *nats.Conn
+	cache *redis.Client
 }
 
 func New(cfg *config.Config) *App {
@@ -49,11 +47,14 @@ func (a *App) Run() error {
 	}
 	defer a.nc.Close()
 
-	paymentRepo := repository.NewPaymentRepository(a.db)
+	if err := a.connectRedis(); err != nil {
+		return err
+	}
+	defer a.cache.Close()
 
+	paymentRepo := repository.NewPaymentRepository(a.db)
 	bookingIntegration := integration.NewBookingIntegration(a.cfg.BookingServiceURL)
 	parkingIntegration := integration.NewParkingIntegration(a.cfg.ParkingServiceURL)
-
 	natsPublisher := publisher.NewNATSPublisher(a.nc)
 
 	paymentService := service.NewPaymentService(
@@ -62,47 +63,17 @@ func (a *App) Run() error {
 		parkingIntegration,
 		natsPublisher,
 	)
-
-	if err := a.startGRPCServer(paymentService); err != nil {
-		return err
-	}
+	paymentService.SetCache(a.cache)
 
 	router := gin.Default()
-
 	paymentHandler := httpdelivery.NewPaymentHandler(paymentService)
 	paymentHandler.RegisterRoutes(router)
 
-	addr := ":" + a.cfg.HTTPPort
+	addr := a.cfg.HTTPAddress()
 
 	log.Printf("payment-service HTTP server is running on %s", addr)
 
 	return router.Run(addr)
-}
-
-func (a *App) startGRPCServer(paymentService *service.PaymentService) error {
-	grpcAddr := ":" + a.cfg.GRPCPort
-
-	listener, err := net.Listen("tcp", grpcAddr)
-	if err != nil {
-		return fmt.Errorf("failed to listen on gRPC address %s: %w", grpcAddr, err)
-	}
-
-	grpcServer := grpc.NewServer()
-
-	paymentv1.RegisterPaymentServiceServer(
-		grpcServer,
-		grpcdelivery.New(paymentService),
-	)
-
-	go func() {
-		log.Printf("payment-service gRPC server is running on %s", grpcAddr)
-
-		if err := grpcServer.Serve(listener); err != nil {
-			log.Printf("payment-service gRPC server stopped: %v", err)
-		}
-	}()
-
-	return nil
 }
 
 func (a *App) connectDB() error {
@@ -131,6 +102,24 @@ func (a *App) connectNATS() error {
 	a.nc = nc
 
 	log.Println("connected to NATS")
+
+	return nil
+}
+
+func (a *App) connectRedis() error {
+	cache := redis.NewClient(&redis.Options{
+		Addr:     a.cfg.RedisAddr(),
+		Password: a.cfg.RedisPassword,
+		DB:       a.cfg.RedisDB,
+	})
+
+	if err := cache.Ping(context.Background()).Err(); err != nil {
+		return err
+	}
+
+	a.cache = cache
+
+	log.Println("connected to Redis")
 
 	return nil
 }

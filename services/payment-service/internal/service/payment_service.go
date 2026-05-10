@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 
 	"payment-service/internal/domain"
 	"payment-service/internal/integration"
@@ -20,6 +21,7 @@ type PaymentService struct {
 	bookingIntegration *integration.BookingIntegration
 	parkingIntegration *integration.ParkingIntegration
 	publisher          *publisher.NATSPublisher
+	cache              *redis.Client
 }
 
 func NewPaymentService(
@@ -36,9 +38,27 @@ func NewPaymentService(
 	}
 }
 
+func (s *PaymentService) SetCache(cache *redis.Client) {
+	s.cache = cache
+}
+
 func (s *PaymentService) CreatePayment(ctx context.Context, input domain.CreatePaymentInput) (*domain.Payment, error) {
 	if err := input.Validate(); err != nil {
 		return nil, err
+	}
+
+	if s.cache != nil {
+		lockKey := "payment:lock:" + input.BookingID
+		ok, err := s.cache.SetNX(ctx, lockKey, "processing", 30*time.Second).Result()
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, errors.New("payment already in progress for this booking")
+		}
+		defer func() {
+			_, _ = s.cache.Del(context.Background(), lockKey).Result()
+		}()
 	}
 
 	booking, err := s.bookingIntegration.GetBooking(ctx, input.BookingID)
@@ -54,7 +74,6 @@ func (s *PaymentService) CreatePayment(ctx context.Context, input domain.CreateP
 	if err != nil {
 		return nil, err
 	}
-
 	if hasPaidPayment {
 		return nil, errors.New("booking is already paid")
 	}
@@ -71,7 +90,7 @@ func (s *PaymentService) CreatePayment(ctx context.Context, input domain.CreateP
 		return nil, fmt.Errorf("failed to calculate payment amount: %w", err)
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 
 	payment := &domain.Payment{
 		ID:            uuid.NewString(),
@@ -79,7 +98,7 @@ func (s *PaymentService) CreatePayment(ctx context.Context, input domain.CreateP
 		UserID:        booking.UserID,
 		ParkingID:     booking.ParkingID,
 		SpotID:        booking.SpotID,
-		Amount:        amount, // amount in tenge
+		Amount:        amount,
 		Method:        input.Method,
 		Status:        domain.StatusPending,
 		FailureReason: "",
@@ -102,8 +121,10 @@ func (s *PaymentService) CreatePayment(ctx context.Context, input domain.CreateP
 		return nil, fmt.Errorf("payment created, but booking confirmation failed: %w", err)
 	}
 
-	if err := s.publisher.PublishPaymentSuccess(ctx, paidPayment.UserID, paidPayment.BookingID, paidPayment.Amount); err != nil {
-		return nil, fmt.Errorf("payment created, but notification event failed: %w", err)
+	if s.publisher != nil {
+		if err := s.publisher.PublishPaymentSuccess(ctx, paidPayment.UserID, paidPayment.BookingID, paidPayment.Amount); err != nil {
+			return nil, fmt.Errorf("payment created, but notification event failed: %w", err)
+		}
 	}
 
 	return paidPayment, nil

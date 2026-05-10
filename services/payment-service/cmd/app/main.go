@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 
+	_ "github.com/lib/pq"
+
 	"payment-service/internal/app"
 	"payment-service/internal/config"
 )
