@@ -15,17 +15,17 @@ services:
     networks:
       - parking_net
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U parking" ]
+      test: ["CMD-SHELL", "pg_isready -U parking"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   redis:
     image: redis:7-alpine
-    container_name: user-redis
+    container_name: parking-redis
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT_HOST:-6379}:6379"
+      - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -47,6 +47,79 @@ services:
     networks:
       - parking_net
 
+  api-gateway:
+    image: nginx:1.27-alpine
+    container_name: api-gateway
+    restart: unless-stopped
+    volumes:
+      - ./services/api-gateway/nginx.conf/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./services/api-gateway/web:/usr/share/nginx/html:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-service
+      - user-service
+      - notification-service
+      - booking-service
+      - parking-service
+      - payment-service
+    networks:
+      - parking_net
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: parking-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - parking_net
+    depends_on:
+      - node-exporter
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: parking-grafana
+    restart: unless-stopped
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3000:3000"
+    networks:
+      - parking_net
+    depends_on:
+      - prometheus
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: parking-node-exporter
+    restart: unless-stopped
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    ports:
+      - "9100:9100"
+    networks:
+      - parking_net
+
   user-service:
     build:
       context: ./services/user-service
@@ -58,6 +131,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      nats:
+        condition: service_started
     env_file:
       - ./services/user-service/.env
     environment:
@@ -68,24 +143,26 @@ services:
       REDIS_PORT: 6379
       REDIS_DB: 0
       NATS_URL: nats://nats:4222
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
     ports:
       - "8081:8081"
       - "9091:9091"
       - "9201:9201"
     networks:
-
       - parking_net
 
   auth-service:
     build:
       context: ./services/auth-service
+      dockerfile: Dockerfile
     container_name: auth-service
     restart: unless-stopped
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
     env_file:
       - ./services/auth-service/.env
     environment:
@@ -94,15 +171,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: 1
-      JWT_SECRET: ${JWT_SECRET}
-      ACCESS_TOKEN_TTL: 15m
-      REFRESH_TOKEN_TTL: 720h
-      VERIFICATION_TOKEN_TTL: 24h
-      PASSWORD_RESET_TTL: 1h
       NATS_URL: nats://nats:4222
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
     ports:
       - "8082:8082"
       - "9092:9092"
@@ -112,11 +181,16 @@ services:
   notification-service:
     build:
       context: ./services/notification-service
+      dockerfile: Dockerfile
     container_name: notification-service
     restart: unless-stopped
     depends_on:
-      - redis
-      - nats
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
     env_file:
       - ./services/notification-service/.env
     environment:
@@ -127,15 +201,6 @@ services:
       REDIS_PORT: 6379
       REDIS_DB: 2
       NATS_URL: nats://nats:4222
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
-      SMTP_USERNAME: ${SMTP_USERNAME}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
-      SMTP_FROM: ${SMTP_FROM}
-      FRONTEND_URL: ${FRONTEND_URL}
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
     ports:
       - "8083:8083"
       - "9093:9093"
@@ -143,9 +208,37 @@ services:
     networks:
       - parking_net
 
+  parking-service:
+    build:
+      context: ./services/parking-service
+      dockerfile: Dockerfile
+    container_name: parking-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./services/parking-service/.env
+    environment:
+      HTTP_PORT: 8085
+      GRPC_PORT: 9095
+      DB_PARKING: postgres://parking:parking@postgres:5432/parking_service?sslmode=disable
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 4
+      REDIS_PASSWORD: ""
+    ports:
+      - "8085:8085"
+      - "9095:9095"
+    networks:
+      - parking_net
+
   booking-service:
     build:
       context: ./services/booking-service
+      dockerfile: Dockerfile
     container_name: booking-service
     restart: unless-stopped
     depends_on:
@@ -154,6 +247,10 @@ services:
       redis:
         condition: service_healthy
       nats:
+        condition: service_started
+      user-service:
+        condition: service_started
+      parking-service:
         condition: service_started
     env_file:
       - ./services/booking-service/.env
@@ -172,48 +269,17 @@ services:
       NATS_URL: nats://nats:4222
       USER_GRPC_ADDR: user-service:9091
       PARKING_GRPC_ADDR: parking-service:9095
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
+      PARKING_HTTP_URL: http://parking-service:8085
     ports:
       - "8084:8084"
       - "9094:9094"
     networks:
       - parking_net
 
-
-  parking-service:
-    build:
-      context: ./services/parking-service
-    container_name: parking-service
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      nats:
-        condition: service_started
-    env_file:
-      - ./services/parking-service/.env
-    environment:
-      HTTP_PORT: 8085
-      GRPC_PORT: 9095
-      DB_PARKING: postgres://parking:parking@postgres:5432/parking_service?sslmode=disable
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_DB: 4
-      REDIS_PASSWORD: ""
-      NATS_URL: nats://nats:4222
-    ports:
-      - "8085:8085"
-      - "9095:9095"
-    networks:
-      - parking_net
-
   payment-service:
     build:
       context: ./services/payment-service
+      dockerfile: Dockerfile
     container_name: payment-service
     restart: unless-stopped
     depends_on:
@@ -227,6 +293,8 @@ services:
         condition: service_started
       parking-service:
         condition: service_started
+      user-service:
+        condition: service_started
     env_file:
       - ./services/payment-service/.env
     environment:
@@ -238,8 +306,13 @@ services:
       DB_PASSWORD: parking
       DB_NAME: payment_service
       DB_SSLMODE: disable
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 5
+      REDIS_PASSWORD: ""
       BOOKING_SERVICE_URL: http://booking-service:8084
       PARKING_SERVICE_URL: http://parking-service:8085
+      USER_SERVICE_URL: http://user-service:8081
       NATS_URL: nats://nats:4222
     ports:
       - "8086:8086"
@@ -250,8 +323,9 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
   parking_net:
     driver: bridge
-

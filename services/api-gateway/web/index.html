@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Online Parking</title>
+    <style>
+        :root { color-scheme: dark; }
+        body { margin: 0; font-family: Arial, sans-serif; background: #0f172a; color: #e2e8f0; }
+        header { padding: 20px 24px; background: #111827; border-bottom: 1px solid #334155; }
+        h1 { margin: 0 0 6px; font-size: 24px; }
+        .wrap { padding: 20px 24px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+        .card { background: #111827; border: 1px solid #334155; border-radius: 14px; padding: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.24); }
+        .card h2 { margin: 0 0 12px; font-size: 18px; }
+        label { display: block; font-size: 13px; margin: 10px 0 4px; color: #cbd5e1; }
+        input, select, button, textarea {
+            width: 100%; box-sizing: border-box; border-radius: 10px; border: 1px solid #475569;
+            background: #0b1220; color: #e2e8f0; padding: 10px 12px; font-size: 14px;
+        }
+        button { cursor: pointer; background: #2563eb; border: 0; margin-top: 10px; }
+        button.secondary { background: #334155; }
+        textarea { min-height: 180px; resize: vertical; white-space: pre; }
+        .row { display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr); }
+        .small { font-size: 12px; color: #94a3b8; }
+        .stack { display: grid; gap: 10px; }
+    </style>
+</head>
+<body>
+<header>
+    <h1>Online Parking</h1>
+    <div class="small">Gateway: <code>/health</code>, API: <code>/api/...</code></div>
+</header>
+
+<div class="wrap">
+    <div class="card">
+        <h2>Gateway / Service health</h2>
+        <div class="stack">
+            <button onclick="ping('/health')">Ping gateway</button>
+            <button class="secondary" onclick="ping('/api/notifications/health')">Ping notification</button>
+            <button class="secondary" onclick="ping('/api/parking/health')">Ping parking</button>
+            <button class="secondary" onclick="ping('/api/users/health')">Ping users</button>
+            <button class="secondary" onclick="ping('/api/bookings/health')">Ping booking</button>
+            <button class="secondary" onclick="ping('/api/payments/health')">Ping payment</button>
+            <button class="secondary" onclick="ping('/api/auth/health')">Ping auth</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Register user</h2>
+        <label>Email</label>
+        <input id="reg_email" placeholder="user@mail.com" />
+        <label>Password</label>
+        <input id="reg_password" type="password" placeholder="password" />
+        <div class="row">
+            <div>
+                <label>First name</label>
+                <input id="reg_first_name" placeholder="Aruzhan" />
+            </div>
+            <div>
+                <label>Last name</label>
+                <input id="reg_last_name" placeholder="S" />
+            </div>
+        </div>
+        <label>Phone</label>
+        <input id="reg_phone" placeholder="+77001234567" />
+        <button onclick="registerUser()">Register</button>
+    </div>
+
+    <div class="card">
+        <h2>Login</h2>
+        <label>Email</label>
+        <input id="login_email" placeholder="user@mail.com" />
+        <label>Password</label>
+        <input id="login_password" type="password" placeholder="password" />
+        <button onclick="loginUser()">Login</button>
+    </div>
+
+    <div class="card">
+        <h2>Create user</h2>
+        <label>Email</label>
+        <input id="user_email" placeholder="user@mail.com" />
+        <div class="row">
+            <div>
+                <label>First name</label>
+                <input id="user_first_name" placeholder="Aruzhan" />
+            </div>
+            <div>
+                <label>Last name</label>
+                <input id="user_last_name" placeholder="S" />
+            </div>
+        </div>
+        <label>Phone</label>
+        <input id="user_phone" placeholder="+77001234567" />
+        <label>Role</label>
+        <select id="user_role">
+            <option value="user" selected>user</option>
+            <option value="admin">admin</option>
+        </select>
+        <button onclick="createUser()">Create</button>
+    </div>
+
+    <div class="card">
+        <h2>Parking</h2>
+        <label>Name</label>
+        <input id="parking_name" placeholder="Parking A" />
+        <label>Address</label>
+        <input id="parking_address" placeholder="City center" />
+        <label>Total spots</label>
+        <input id="parking_total_spots" type="number" value="10" />
+        <button onclick="createParking()">Create parking</button>
+        <button class="secondary" onclick="getParkings()">List parkings</button>
+    </div>
+
+    <div class="card">
+        <h2>Tariff</h2>
+        <label>Parking ID</label>
+        <input id="tariff_parking_id" type="number" placeholder="1" />
+        <label>Hours</label>
+        <input id="tariff_hours" type="number" value="1" />
+        <button onclick="calculateTariff()">Calculate price</button>
+    </div>
+
+    <div class="card">
+        <h2>Create booking</h2>
+        <label>User ID</label>
+        <input id="booking_user_id" placeholder="user-id" />
+        <label>Parking ID</label>
+        <input id="booking_parking_id" type="number" placeholder="1" />
+        <label>Vehicle plate</label>
+        <input id="booking_vehicle_plate" placeholder="777ABC01" />
+        <div class="row">
+            <div>
+                <label>Start time</label>
+                <input id="booking_start_time" />
+            </div>
+            <div>
+                <label>End time</label>
+                <input id="booking_end_time" />
+            </div>
+        </div>
+        <label>Spot ID (optional, leave empty for random spot)</label>
+        <input id="booking_spot_id" type="number" placeholder="0" />
+        <button onclick="createBooking()">Create booking</button>
+    </div>
+
+    <div class="card">
+        <h2>Booking actions</h2>
+        <label>Booking ID</label>
+        <input id="booking_action_id" placeholder="booking-id" />
+        <button onclick="confirmBooking()">Confirm</button>
+        <button class="secondary" onclick="startBooking()">Start</button>
+        <button class="secondary" onclick="completeBooking()">Complete</button>
+        <button class="secondary" onclick="cancelBooking()">Cancel</button>
+    </div>
+
+    <div class="card">
+        <h2>Payment</h2>
+        <label>Booking ID</label>
+        <input id="payment_booking_id" placeholder="booking-id" />
+        <label>Method</label>
+        <select id="payment_method">
+            <option value="card">card</option>
+            <option value="cash">cash</option>
+            <option value="kaspi">kaspi</option>
+        </select>
+        <button onclick="createPayment()">Create payment</button>
+        <button class="secondary" onclick="listPayments()">List payments</button>
+    </div>
+
+    <div class="card">
+        <h2>Output</h2>
+        <textarea id="output" readonly></textarea>
+    </div>
+</div>
+
+<script>
+    const out = document.getElementById('output');
+
+    function nowPlus(hours) {
+        const d = new Date();
+        d.setHours(d.getHours() + hours);
+        return d.toISOString();
+    }
+
+    document.getElementById('booking_start_time').value = nowPlus(1);
+    document.getElementById('booking_end_time').value = nowPlus(2);
+
+    async function request(path, method = 'GET', body = null) {
+        const res = await fetch(path, {
+            method,
+            headers: body ? { 'Content-Type': 'application/json' } : undefined,
+            body: body ? JSON.stringify(body) : undefined
+        });
+
+        const text = await res.text();
+        let data = text;
+        try { data = text ? JSON.parse(text) : null; } catch (_) {}
+        out.value = JSON.stringify({
+            path,
+            status: res.status,
+            ok: res.ok,
+            data
+        }, null, 2);
+        return { res, data };
+    }
+
+    function ping(path) {
+        return request(path);
+    }
+
+    function registerUser() {
+        return request('/api/auth/register', 'POST', {
+            email: document.getElementById('reg_email').value.trim(),
+            password: document.getElementById('reg_password').value,
+            first_name: document.getElementById('reg_first_name').value.trim(),
+            last_name: document.getElementById('reg_last_name').value.trim(),
+            phone: document.getElementById('reg_phone').value.trim()
+        });
+    }
+
+    function loginUser() {
+        return request('/api/auth/login', 'POST', {
+            email: document.getElementById('login_email').value.trim(),
+            password: document.getElementById('login_password').value
+        });
+    }
+
+    function createUser() {
+        return request('/api/users/', 'POST', {
+            email: document.getElementById('user_email').value.trim(),
+            first_name: document.getElementById('user_first_name').value.trim(),
+            last_name: document.getElementById('user_last_name').value.trim(),
+            phone: document.getElementById('user_phone').value.trim(),
+            role: document.getElementById('user_role').value
+        });
+    }
+
+    function createParking() {
+        return request('/api/parking/parkings', 'POST', {
+            name: document.getElementById('parking_name').value.trim(),
+            address: document.getElementById('parking_address').value.trim(),
+            total_spots: Number(document.getElementById('parking_total_spots').value || 0)
+        });
+    }
+
+    function getParkings() {
+        return request('/api/parking/parkings');
+    }
+
+    function calculateTariff() {
+        const parkingId = document.getElementById('tariff_parking_id').value.trim();
+        const hours = document.getElementById('tariff_hours').value.trim();
+        return request(`/api/parking/tariffs/${encodeURIComponent(parkingId)}/calculate?hours=${encodeURIComponent(hours)}`);
+    }
+
+    function createBooking() {
+        const spotValue = document.getElementById('booking_spot_id').value.trim();
+        return request('/api/bookings/', 'POST', {
+            user_id: document.getElementById('booking_user_id').value.trim(),
+            parking_id: Number(document.getElementById('booking_parking_id').value || 0),
+            spot_id: spotValue ? Number(spotValue) : 0,
+            vehicle_plate: document.getElementById('booking_vehicle_plate').value.trim(),
+            start_time: document.getElementById('booking_start_time').value,
+            end_time: document.getElementById('booking_end_time').value
+        });
+    }
+
+    function confirmBooking() {
+        const id = document.getElementById('booking_action_id').value.trim();
+        return request(`/api/bookings/${encodeURIComponent(id)}/confirm`, 'POST');
+    }
+
+    function startBooking() {
+        const id = document.getElementById('booking_action_id').value.trim();
+        return request(`/api/bookings/${encodeURIComponent(id)}/start`, 'POST');
+    }
+
+    function completeBooking() {
+        const id = document.getElementById('booking_action_id').value.trim();
+        return request(`/api/bookings/${encodeURIComponent(id)}/complete`, 'POST');
+    }
+
+    function cancelBooking() {
+        const id = document.getElementById('booking_action_id').value.trim();
+        return request(`/api/bookings/${encodeURIComponent(id)}/cancel`, 'POST', {
+            reason: 'cancelled from frontend'
+        });
+    }
+
+    function createPayment() {
+        return request('/api/payments/', 'POST', {
+            booking_id: document.getElementById('payment_booking_id').value.trim(),
+            method: document.getElementById('payment_method').value
+        });
+    }
+
+    function listPayments() {
+        return request('/api/payments/');
+    }
+</script>
+</body>
+</html>
