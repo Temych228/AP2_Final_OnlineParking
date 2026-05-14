@@ -11,6 +11,7 @@ import (
 	"github.com/Temych228/AP2_Final_OnlineParking/services/notification-service/internal/repository"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/notification-service/internal/service"
 	grpcserver "github.com/Temych228/AP2_Final_OnlineParking/services/notification-service/internal/transport/grpc"
+	httptransport "github.com/Temych228/AP2_Final_OnlineParking/services/notification-service/internal/transport/http"
 	notificationv1 "github.com/Temych228/ap2_protos_go_final/notification/v1"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
@@ -75,10 +76,7 @@ func New(cfg *config.Config) (*App, error) {
 	notificationv1.RegisterNotificationServiceServer(grpcSrv, grpcserver.New(svc))
 
 	httpMux := http.NewServeMux()
-	httpMux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
-	})
+	httptransport.New(svc).Register(httpMux)
 
 	httpServer := &http.Server{
 		Addr:    cfg.HTTPAddress(),
@@ -113,17 +111,17 @@ func New(cfg *config.Config) (*App, error) {
 
 func (a *App) subscribeNATS() error {
 	subjects := []string{
-		"parking.user.*",
-		"parking.booking.*",
-		"parking.payment.*",
-		"parking.auth.*",
+		"parking.user.registered",
+		"parking.payment.success",
+		"parking.booking.confirmed",
+		"parking.booking.cancelled",
+		"parking.auth.password_reset",
 	}
 
 	for _, subject := range subjects {
-		subject := subject
 		if _, err := a.nats.Subscribe(subject, func(msg *nats.Msg) {
-			if err := a.svc.HandleEvent(context.Background(), subject, msg.Data); err != nil {
-				log.Printf("nats handler error subject=%s err=%v", subject, err)
+			if err := a.svc.HandleEvent(context.Background(), msg.Subject, msg.Data); err != nil {
+				log.Printf("nats handler error subject=%s err=%v", msg.Subject, err)
 			}
 		}); err != nil {
 			return err
@@ -171,7 +169,8 @@ func (a *App) Run(ctx context.Context) error {
 		}
 	}()
 
-	log.Printf("notification-service started on %s, grpc on %s, metrics on %s", a.cfg.HTTPAddress(), a.cfg.GRPCAddress(), a.cfg.MetricsAddress())
+	log.Printf("notification-service started on %s, grpc on %s, metrics on %s",
+		a.cfg.HTTPAddress(), a.cfg.GRPCAddress(), a.cfg.MetricsAddress())
 	return nil
 }
 
@@ -182,30 +181,23 @@ func (a *App) Shutdown(ctx context.Context) error {
 	if a.httpServer != nil {
 		_ = a.httpServer.Shutdown(shutdownCtx)
 	}
-
 	if a.metricsServer != nil {
 		_ = a.metricsServer.Shutdown(shutdownCtx)
 	}
-
 	if a.grpcServer != nil {
 		a.grpcServer.GracefulStop()
 	}
-
 	if a.grpcListener != nil {
 		_ = a.grpcListener.Close()
 	}
-
 	if a.nats != nil {
 		a.nats.Close()
 	}
-
 	if a.cache != nil {
 		_ = a.cache.Close()
 	}
-
 	if a.db != nil {
 		a.db.Close()
 	}
-
 	return nil
 }

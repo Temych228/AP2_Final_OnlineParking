@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -36,7 +37,7 @@ func (h *TariffHandler) CreateTariff(c *gin.Context) {
 
 	tariff, err := h.tariffUC.CreateTariff(req.ParkingID, req.PricePerHour)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeTariffError(c, err)
 		return
 	}
 
@@ -52,7 +53,11 @@ func (h *TariffHandler) GetTariff(c *gin.Context) {
 
 	tariff, err := h.tariffUC.GetTariff(parkingID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "tariff not found"})
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "tariff not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -73,7 +78,7 @@ func (h *TariffHandler) UpdateTariff(c *gin.Context) {
 	}
 
 	if err := h.tariffUC.UpdateTariff(parkingID, req.PricePerHour); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeTariffError(c, err)
 		return
 	}
 
@@ -95,9 +100,22 @@ func (h *TariffHandler) CalculatePrice(c *gin.Context) {
 
 	price, err := h.tariffUC.CalculatePrice(parkingID, hours)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeTariffError(c, err)
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"total_price": price})
+}
+
+func writeTariffError(c *gin.Context, err error) {
+	msg := strings.ToLower(err.Error())
+
+	switch {
+	case strings.Contains(msg, "required"), strings.Contains(msg, "invalid"), strings.Contains(msg, "must be greater than zero"):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case strings.Contains(msg, "not found"):
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+	default:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
 }

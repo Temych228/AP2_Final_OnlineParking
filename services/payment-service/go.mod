@@ -1,4 +1,4 @@
-module payment-service
+module github.com/Temych228/AP2_Final_OnlineParking/services/payment-service
 
 go 1.26.2
 

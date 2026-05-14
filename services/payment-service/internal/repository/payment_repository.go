@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"payment-service/internal/domain"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/domain"
 )
 
 var ErrPaymentNotFound = errors.New("payment not found")

@@ -12,6 +12,7 @@ import (
 	"github.com/Temych228/AP2_Final_OnlineParking/services/auth-service/internal/repository"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/auth-service/internal/service"
 	grpcserver "github.com/Temych228/AP2_Final_OnlineParking/services/auth-service/internal/transport/grpc"
+	httptransport "github.com/Temych228/AP2_Final_OnlineParking/services/auth-service/internal/transport/http"
 	authv1 "github.com/Temych228/ap2_protos_go_final/auth/v1"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
@@ -72,10 +73,7 @@ func New(cfg *config.Config) (*App, error) {
 	authv1.RegisterAuthServiceServer(grpcSrv, grpcserver.New(svc))
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
-	})
+	httptransport.New(svc).Register(mux)
 
 	httpServer := &http.Server{
 		Addr:    cfg.Address(),

@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"payment-service/internal/domain"
-	"payment-service/internal/service"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/domain"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/service"
 
 	paymentv1 "github.com/Temych228/ap2_protos_go_final/payment/v1"
 	"google.golang.org/grpc/codes"

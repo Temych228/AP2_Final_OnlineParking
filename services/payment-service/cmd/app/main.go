@@ -5,8 +5,8 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"payment-service/internal/app"
-	"payment-service/internal/config"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/app"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/config"
 )
 
 func main() {

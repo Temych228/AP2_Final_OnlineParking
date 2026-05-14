@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -15,7 +16,7 @@ type BookingIntegration struct {
 
 func NewBookingIntegration(baseURL string) *BookingIntegration {
 	return &BookingIntegration{
-		baseURL: baseURL,
+		baseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/"),
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -25,6 +26,7 @@ func NewBookingIntegration(baseURL string) *BookingIntegration {
 type BookingInfo struct {
 	ID        string    `json:"id"`
 	UserID    string    `json:"user_id"`
+	UserEmail string    `json:"user_email"`
 	ParkingID int64     `json:"parking_id"`
 	SpotID    int64     `json:"spot_id"`
 	Status    string    `json:"status"`
@@ -33,7 +35,7 @@ type BookingInfo struct {
 }
 
 func (b *BookingIntegration) GetBooking(ctx context.Context, bookingID string) (*BookingInfo, error) {
-	url := fmt.Sprintf("%s/bookings/%s", b.baseURL, bookingID)
+	url := fmt.Sprintf("%s/bookings/%s", b.baseURL, strings.TrimSpace(bookingID))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -59,7 +61,7 @@ func (b *BookingIntegration) GetBooking(ctx context.Context, bookingID string) (
 }
 
 func (b *BookingIntegration) ConfirmBooking(ctx context.Context, bookingID string) error {
-	url := fmt.Sprintf("%s/bookings/%s/confirm", b.baseURL, bookingID)
+	url := fmt.Sprintf("%s/bookings/%s/confirm", b.baseURL, strings.TrimSpace(bookingID))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {

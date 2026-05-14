@@ -1,17 +1,14 @@
-package grpc
+package grpcserver
 
 import (
 	"context"
 	"errors"
-	"net"
 
 	"github.com/Temych228/AP2_Final_OnlineParking/services/booking-service/internal/domain"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/booking-service/internal/service"
 	bookingv1 "github.com/Temych228/ap2_protos_go_final/booking/v1"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -24,26 +21,6 @@ type Server struct {
 func New(svc *service.BookingService) *Server {
 	return &Server{svc: svc}
 }
-
-func (s *Server) Run(ctx context.Context, port string) error {
-	lis, err := net.Listen("tcp", ":"+port)
-	if err != nil {
-		return err
-	}
-
-	grpcServer := grpc.NewServer()
-	bookingv1.RegisterBookingServiceServer(grpcServer, s)
-	reflection.Register(grpcServer)
-
-	go func() {
-		<-ctx.Done()
-		grpcServer.GracefulStop()
-	}()
-
-	return grpcServer.Serve(lis)
-}
-
-/* ================= CREATE ================= */
 
 func (s *Server) CreateBooking(ctx context.Context, req *bookingv1.CreateBookingRequest) (*bookingv1.CreateBookingResponse, error) {
 	booking, err := s.svc.CreateBooking(ctx, domain.CreateInput{
@@ -64,8 +41,6 @@ func (s *Server) CreateBooking(ctx context.Context, req *bookingv1.CreateBooking
 	}, nil
 }
 
-/* ================= GET ================= */
-
 func (s *Server) GetBooking(ctx context.Context, req *bookingv1.GetBookingRequest) (*bookingv1.GetBookingResponse, error) {
 	booking, err := s.svc.GetBooking(ctx, req.GetBookingId())
 	if err != nil {
@@ -74,8 +49,6 @@ func (s *Server) GetBooking(ctx context.Context, req *bookingv1.GetBookingReques
 
 	return mapBookingToGetResponse(booking), nil
 }
-
-/* ================= LIST ================= */
 
 func (s *Server) ListBookings(ctx context.Context, req *bookingv1.ListBookingsRequest) (*bookingv1.ListBookingsResponse, error) {
 	items, total, err := s.svc.ListBookings(ctx, domain.ListFilter{
@@ -101,8 +74,6 @@ func (s *Server) ListBookings(ctx context.Context, req *bookingv1.ListBookingsRe
 
 	return resp, nil
 }
-
-/* ================= ACTIONS ================= */
 
 func (s *Server) ConfirmBooking(ctx context.Context, req *bookingv1.ConfirmBookingRequest) (*bookingv1.ConfirmBookingResponse, error) {
 	booking, err := s.svc.ConfirmBooking(ctx, req.GetBookingId())
@@ -152,8 +123,6 @@ func (s *Server) CompleteBooking(ctx context.Context, req *bookingv1.CompleteBoo
 	}, nil
 }
 
-/* ================= MAPPERS ================= */
-
 func mapBookingToGetResponse(b *domain.Booking) *bookingv1.GetBookingResponse {
 	var cancelledAt *timestamppb.Timestamp
 	if b.CancelledAt != nil {
@@ -187,8 +156,6 @@ func mapBookingToItem(b *domain.Booking) *bookingv1.BookingItem {
 		EndTime:   timestamppb.New(b.EndTime),
 	}
 }
-
-/* ================= ERROR MAP ================= */
 
 func mapError(err error) error {
 	switch {

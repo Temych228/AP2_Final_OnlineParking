@@ -25,6 +25,13 @@ type createBookingRequest struct {
 	EndTime      string `json:"end_time"`
 }
 
+type quickBookingRequest struct {
+	UserID       string `json:"user_id"`
+	ParkingID    int64  `json:"parking_id"`
+	VehiclePlate string `json:"vehicle_plate"`
+	Hours        int    `json:"hours"`
+}
+
 type cancelBookingRequest struct {
 	Reason string `json:"reason"`
 }
@@ -38,6 +45,7 @@ func (h *Handler) Register(router *gin.Engine) {
 	router.GET("/ready", h.Health)
 
 	bookings := router.Group("/bookings")
+	bookings.POST("/quick", h.CreateQuickBooking)
 	bookings.POST("", h.CreateBooking)
 	bookings.GET("", h.ListBookings)
 	bookings.GET("/:id", h.GetBooking)
@@ -49,6 +57,44 @@ func (h *Handler) Register(router *gin.Engine) {
 
 func (h *Handler) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func (h *Handler) CreateQuickBooking(c *gin.Context) {
+	var req quickBookingRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.Hours <= 0 {
+		req.Hours = 1
+	}
+
+	if req.UserID == "" || req.ParkingID <= 0 || strings.TrimSpace(req.VehiclePlate) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id, parking_id and vehicle_plate are required"})
+		return
+	}
+
+	startTime := time.Now().UTC()
+	endTime := startTime.Add(time.Duration(req.Hours) * time.Hour)
+
+	booking, err := h.service.CreateBooking(c.Request.Context(), domain.CreateInput{
+		UserID:       req.UserID,
+		ParkingID:    req.ParkingID,
+		SpotID:       0,
+		VehiclePlate: req.VehiclePlate,
+		StartTime:    startTime,
+		EndTime:      endTime,
+	})
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"success": true,
+		"booking": booking,
+	})
 }
 
 func (h *Handler) CreateBooking(c *gin.Context) {
@@ -199,6 +245,10 @@ func (h *Handler) writeError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrBookingNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case errors.Is(err, domain.ErrBookingConflict), errors.Is(err, domain.ErrInvalidStatusTransition):
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case errors.Is(err, domain.ErrUserNotFound), errors.Is(err, domain.ErrParkingLotNotFound), errors.Is(err, domain.ErrParkingSpotNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+	case errors.Is(err, domain.ErrNoAvailableSpots):
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

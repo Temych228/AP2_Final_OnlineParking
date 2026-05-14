@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -23,19 +24,20 @@ const (
 )
 
 type Payment struct {
-	ID                string
-	BookingID         string
-	UserID            string
-	ParkingID         int64
-	SpotID            int64
-	Amount            float64
-	Method            PaymentMethod
-	Status            PaymentStatus
-	ProviderPaymentID string
-	FailureReason     string
-	CreatedAt         time.Time
-	PaidAt            *time.Time
-	UpdatedAt         time.Time
+	ID                string        `json:"id"`
+	BookingID         string        `json:"booking_id"`
+	UserID            string        `json:"user_id"`
+	UserEmail         string        `json:"user_email,omitempty"`
+	ParkingID         int64         `json:"parking_id"`
+	SpotID            int64         `json:"spot_id"`
+	Amount            float64       `json:"amount"`
+	Method            PaymentMethod `json:"method"`
+	Status            PaymentStatus `json:"status"`
+	ProviderPaymentID string        `json:"provider_payment_id,omitempty"`
+	FailureReason     string        `json:"failure_reason,omitempty"`
+	CreatedAt         time.Time     `json:"created_at"`
+	PaidAt            *time.Time    `json:"paid_at,omitempty"`
+	UpdatedAt         time.Time     `json:"updated_at"`
 }
 
 type CreatePaymentInput struct {
@@ -43,20 +45,31 @@ type CreatePaymentInput struct {
 	Method    PaymentMethod `json:"method"`
 }
 
+var (
+	ErrInvalidInput       = errors.New("invalid input")
+	ErrInvalidMethod      = errors.New("invalid payment method")
+	ErrBookingNotFound    = errors.New("booking not found")
+	ErrBookingAlreadyPaid = errors.New("booking is already paid")
+	ErrPaymentAlreadyPaid = errors.New("payment is already paid")
+)
+
 func (i CreatePaymentInput) Validate() error {
+	i.BookingID = strings.TrimSpace(i.BookingID)
+	i.Method = PaymentMethod(strings.TrimSpace(string(i.Method)))
+
 	if i.BookingID == "" {
-		return errors.New("booking_id is required")
+		return ErrInvalidInput
 	}
 
 	if i.Method == "" {
-		return errors.New("method is required")
+		return ErrInvalidInput
 	}
 
 	switch i.Method {
 	case MethodCard, MethodCash, MethodKaspi:
 		return nil
 	default:
-		return errors.New("invalid payment method")
+		return ErrInvalidMethod
 	}
 }
 

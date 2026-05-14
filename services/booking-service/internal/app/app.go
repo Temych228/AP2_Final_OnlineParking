@@ -44,7 +44,6 @@ type App struct {
 func New(cfg *config.Config) (*App, error) {
 	ctx := context.Background()
 
-	// --- Databases ---
 	db, err := pgxpool.New(ctx, cfg.PostgresDSN())
 	if err != nil {
 		return nil, err
@@ -65,7 +64,6 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
-	// --- Brokers ---
 	nc, err := nats.Connect(cfg.NATSURL)
 	if err != nil {
 		db.Close()
@@ -73,7 +71,6 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
-	// --- gRPC Clients (Dialing other services) ---
 	dialCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
@@ -104,20 +101,17 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
-	// --- Business Logic ---
 	repo := repository.NewBookingRepository(db, cache, cfg.CacheTTL)
 	svc := service.New(
 		repo,
 		client.NewUserClient(userConn),
-		client.NewParkingClient(parkingConn),
+		client.NewParkingClient(parkingConn, cfg.ParkingHTTPURL),
 		publisher.New(nc),
 	)
 
-	// --- gRPC Server Registration ---
 	grpcSrv := grpc.NewServer()
 	bookingv1.RegisterBookingServiceServer(grpcSrv, grpcserver.New(svc))
 
-	// --- HTTP/REST Server Setup (Gin) ---
 	router := gin.New()
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
@@ -126,7 +120,7 @@ func New(cfg *config.Config) (*App, error) {
 	httpHandler.Register(router)
 
 	httpSrv := &http.Server{
-		Addr:    cfg.Address(), // Использует AppPort (8084)
+		Addr:    cfg.Address(),
 		Handler: router,
 	}
 
@@ -143,14 +137,12 @@ func New(cfg *config.Config) (*App, error) {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	// Start gRPC listener
 	grpcLis, err := net.Listen("tcp", ":"+a.cfg.GRPCPort)
 	if err != nil {
 		return err
 	}
 	a.grpcListener = grpcLis
 
-	// Start gRPC Server
 	go func() {
 		log.Printf("booking grpc started on :%s", a.cfg.GRPCPort)
 		if err := a.grpcServer.Serve(grpcLis); err != nil && err != grpc.ErrServerStopped {
@@ -158,7 +150,6 @@ func (a *App) Run(ctx context.Context) error {
 		}
 	}()
 
-	// Start HTTP/REST Server
 	go func() {
 		log.Printf("booking http started on %s", a.cfg.Address())
 		if err := a.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -166,13 +157,7 @@ func (a *App) Run(ctx context.Context) error {
 		}
 	}()
 
-	// Graceful shutdown watcher
-	go func() {
-		<-ctx.Done()
-		log.Println("received shutdown signal, stopping servers...")
-		_ = a.Shutdown(context.Background())
-	}()
-
+	log.Println("booking service is ready")
 	return nil
 }
 
@@ -180,44 +165,30 @@ func (a *App) Shutdown(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	// 1. Stop HTTP
 	if a.httpServer != nil {
-		log.Println("stopping http server...")
 		_ = a.httpServer.Shutdown(shutdownCtx)
 	}
-
-	// 2. Stop gRPC Server
 	if a.grpcServer != nil {
-		log.Println("stopping grpc server...")
 		a.grpcServer.GracefulStop()
 	}
-
-	// 3. Close Listener
 	if a.grpcListener != nil {
 		_ = a.grpcListener.Close()
-	}
-
-	// 4. Close gRPC Client connections
-	if a.parkingConn != nil {
-		_ = a.parkingConn.Close()
 	}
 	if a.userConn != nil {
 		_ = a.userConn.Close()
 	}
-
-	// 5. Close NATS
-	if a.nats != nil {
-		a.nats.Close()
+	if a.parkingConn != nil {
+		_ = a.parkingConn.Close()
 	}
-
-	// 6. Close Databases
 	if a.cache != nil {
 		_ = a.cache.Close()
 	}
 	if a.db != nil {
 		a.db.Close()
 	}
+	if a.nats != nil {
+		a.nats.Close()
+	}
 
-	log.Println("app stopped gracefully")
 	return nil
 }

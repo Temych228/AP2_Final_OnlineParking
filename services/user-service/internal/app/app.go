@@ -98,7 +98,7 @@ func New(cfg *config.Config) (*App, error) {
 	router := gin.New()
 	router.Use(gin.Recovery())
 
-	httpHandler := httptransport.New()
+	httpHandler := httptransport.New(svc)
 	httpHandler.Register(router)
 
 	httpServer := &http.Server{

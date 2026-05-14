@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -37,7 +38,7 @@ func (h *SpotHandler) CreateSpot(c *gin.Context) {
 
 	spot, err := h.spotUC.CreateSpot(req.ParkingID, req.Number)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeSpotError(c, err)
 		return
 	}
 
@@ -53,7 +54,11 @@ func (h *SpotHandler) GetSpot(c *gin.Context) {
 
 	spot, err := h.spotUC.GetSpot(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "spot not found"})
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "spot not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -91,7 +96,7 @@ func (h *SpotHandler) UpdateSpotStatus(c *gin.Context) {
 
 	err = h.spotUC.UpdateSpotStatus(spotID, domain.SpotStatus(req.Status))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeSpotError(c, err)
 		return
 	}
 
@@ -106,7 +111,7 @@ func (h *SpotHandler) ReserveSpot(c *gin.Context) {
 	}
 
 	if err := h.spotUC.ReserveSpot(spotID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeSpotError(c, err)
 		return
 	}
 
@@ -121,7 +126,7 @@ func (h *SpotHandler) ReleaseSpot(c *gin.Context) {
 	}
 
 	if err := h.spotUC.ReleaseSpot(spotID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeSpotError(c, err)
 		return
 	}
 
@@ -136,9 +141,26 @@ func (h *SpotHandler) DeleteSpot(c *gin.Context) {
 	}
 
 	if err := h.spotUC.DeleteSpot(spotID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeSpotError(c, err)
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "spot deleted"})
+}
+
+func writeSpotError(c *gin.Context, err error) {
+	msg := strings.ToLower(err.Error())
+
+	switch {
+	case strings.Contains(msg, "required"), strings.Contains(msg, "invalid"):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case strings.Contains(msg, "not found"):
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+	case strings.Contains(msg, "not available"), strings.Contains(msg, "not reserved"), strings.Contains(msg, "already"):
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case strings.Contains(msg, "limit reached"):
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+	default:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
 }

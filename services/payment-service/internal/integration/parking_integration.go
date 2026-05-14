@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -15,7 +16,7 @@ type ParkingIntegration struct {
 
 func NewParkingIntegration(baseURL string) *ParkingIntegration {
 	return &ParkingIntegration{
-		baseURL: baseURL,
+		baseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/"),
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},

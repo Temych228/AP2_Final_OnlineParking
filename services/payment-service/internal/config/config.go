@@ -26,6 +26,7 @@ type Config struct {
 
 	BookingServiceURL string
 	ParkingServiceURL string
+	UserServiceURL    string
 	NATSURL           string
 }
 
@@ -55,6 +56,7 @@ func Load() (*Config, error) {
 
 		BookingServiceURL: getEnv("BOOKING_SERVICE_URL", "http://localhost:8084"),
 		ParkingServiceURL: getEnv("PARKING_SERVICE_URL", "http://localhost:8085"),
+		UserServiceURL:    getEnv("USER_SERVICE_URL", "http://localhost:8081"),
 		NATSURL:           getEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }

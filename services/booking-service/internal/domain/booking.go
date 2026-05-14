@@ -19,6 +19,7 @@ const (
 type Booking struct {
 	ID           string        `json:"id"`
 	UserID       string        `json:"user_id"`
+	UserEmail    string        `json:"user_email,omitempty"`
 	ParkingID    int64         `json:"parking_id"`
 	SpotID       int64         `json:"spot_id"`
 	VehiclePlate string        `json:"vehicle_plate"`
@@ -57,6 +58,7 @@ var (
 	ErrUserNotFound            = errors.New("user does not exist")
 	ErrParkingLotNotFound      = errors.New("parking lot does not exist")
 	ErrParkingSpotNotFound     = errors.New("parking spot does not exist")
+	ErrNoAvailableSpots        = errors.New("no available spots for the selected parking")
 )
 
 func (s BookingStatus) IsValid() bool {
@@ -85,7 +87,11 @@ func (i *CreateInput) Validate() error {
 	i.UserID = strings.TrimSpace(i.UserID)
 	i.VehiclePlate = normalizeVehiclePlate(i.VehiclePlate)
 
-	if i.UserID == "" || i.ParkingID <= 0 || i.SpotID <= 0 || i.VehiclePlate == "" {
+	if i.UserID == "" || i.ParkingID <= 0 || i.VehiclePlate == "" {
+		return ErrInvalidInput
+	}
+
+	if i.SpotID < 0 {
 		return ErrInvalidInput
 	}
 

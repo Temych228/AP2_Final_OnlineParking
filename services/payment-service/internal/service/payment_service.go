@@ -10,16 +10,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
-	"payment-service/internal/domain"
-	"payment-service/internal/integration"
-	"payment-service/internal/publisher"
-	"payment-service/internal/repository"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/domain"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/integration"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/publisher"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/repository"
 )
 
 type PaymentService struct {
 	repo               *repository.PaymentRepository
 	bookingIntegration *integration.BookingIntegration
 	parkingIntegration *integration.ParkingIntegration
+	userIntegration    *integration.UserIntegration
 	publisher          *publisher.NATSPublisher
 	cache              *redis.Client
 }
@@ -28,12 +29,14 @@ func NewPaymentService(
 	repo *repository.PaymentRepository,
 	bookingIntegration *integration.BookingIntegration,
 	parkingIntegration *integration.ParkingIntegration,
+	userIntegration *integration.UserIntegration,
 	publisher *publisher.NATSPublisher,
 ) *PaymentService {
 	return &PaymentService{
 		repo:               repo,
 		bookingIntegration: bookingIntegration,
 		parkingIntegration: parkingIntegration,
+		userIntegration:    userIntegration,
 		publisher:          publisher,
 	}
 }
@@ -82,7 +85,6 @@ func (s *PaymentService) CreatePayment(ctx context.Context, input domain.CreateP
 	if hours <= 0 {
 		return nil, errors.New("invalid booking time range")
 	}
-
 	hours = math.Ceil(hours)
 
 	amount, err := s.parkingIntegration.CalculatePrice(ctx, booking.ParkingID, hours)
@@ -90,20 +92,28 @@ func (s *PaymentService) CreatePayment(ctx context.Context, input domain.CreateP
 		return nil, fmt.Errorf("failed to calculate payment amount: %w", err)
 	}
 
+	userEmail := booking.UserEmail
+	if userEmail == "" && s.userIntegration != nil {
+		userEmail, err = s.userIntegration.GetUserEmail(ctx, booking.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user email: %w", err)
+		}
+	}
+
 	now := time.Now().UTC()
 
 	payment := &domain.Payment{
-		ID:            uuid.NewString(),
-		BookingID:     booking.ID,
-		UserID:        booking.UserID,
-		ParkingID:     booking.ParkingID,
-		SpotID:        booking.SpotID,
-		Amount:        amount,
-		Method:        input.Method,
-		Status:        domain.StatusPending,
-		FailureReason: "",
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		ID:        uuid.NewString(),
+		BookingID: booking.ID,
+		UserID:    booking.UserID,
+		UserEmail: userEmail,
+		ParkingID: booking.ParkingID,
+		SpotID:    booking.SpotID,
+		Amount:    amount,
+		Method:    input.Method,
+		Status:    domain.StatusPending,
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 
 	if err := s.repo.Create(ctx, payment); err != nil {
@@ -121,8 +131,8 @@ func (s *PaymentService) CreatePayment(ctx context.Context, input domain.CreateP
 		return nil, fmt.Errorf("payment created, but booking confirmation failed: %w", err)
 	}
 
-	if s.publisher != nil {
-		if err := s.publisher.PublishPaymentSuccess(ctx, paidPayment.UserID, paidPayment.BookingID, paidPayment.Amount); err != nil {
+	if s.publisher != nil && userEmail != "" {
+		if err := s.publisher.PublishPaymentSuccess(ctx, paidPayment.UserID, userEmail, paidPayment.BookingID, paidPayment.Amount); err != nil {
 			return nil, fmt.Errorf("payment created, but notification event failed: %w", err)
 		}
 	}
@@ -134,7 +144,6 @@ func (s *PaymentService) GetPayment(ctx context.Context, id string) (*domain.Pay
 	if id == "" {
 		return nil, errors.New("payment id is required")
 	}
-
 	return s.repo.GetByID(ctx, id)
 }
 
@@ -142,7 +151,6 @@ func (s *PaymentService) GetPaymentByBooking(ctx context.Context, bookingID stri
 	if bookingID == "" {
 		return nil, errors.New("booking id is required")
 	}
-
 	return s.repo.GetByBookingID(ctx, bookingID)
 }
 

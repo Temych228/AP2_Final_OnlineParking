@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -29,21 +30,13 @@ func (h *ParkingHandler) CreateParking(c *gin.Context) {
 	var req CreateParkingRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	parking, err := h.parkingUC.CreateParking(
-		req.Name,
-		req.Address,
-		req.TotalSpots,
-	)
+	parking, err := h.parkingUC.CreateParking(req.Name, req.Address, req.TotalSpots)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
-		})
+		writeParkingError(c, err)
 		return
 	}
 
@@ -55,17 +48,17 @@ func (h *ParkingHandler) GetParking(c *gin.Context) {
 
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid parking id",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid parking id"})
 		return
 	}
 
 	parking, err := h.parkingUC.GetParking(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "parking not found",
-		})
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "parking not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -75,11 +68,29 @@ func (h *ParkingHandler) GetParking(c *gin.Context) {
 func (h *ParkingHandler) GetAllParkings(c *gin.Context) {
 	parkings, err := h.parkingUC.GetAllParkings()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, parkings)
+}
+
+func writeParkingError(c *gin.Context, err error) {
+	if err == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "unknown error"})
+		return
+	}
+
+	msg := strings.ToLower(err.Error())
+
+	switch {
+	case strings.Contains(msg, "required"), strings.Contains(msg, "must be greater than zero"), strings.Contains(msg, "invalid"):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case strings.Contains(msg, "not found"):
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+	case strings.Contains(msg, "limit reached"):
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+	default:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
 }

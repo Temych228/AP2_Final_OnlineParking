@@ -28,6 +28,7 @@ type Config struct {
 	NATSURL         string
 	UserGRPCAddr    string
 	ParkingGRPCAddr string
+	ParkingHTTPURL  string
 
 	CacheTTL time.Duration
 }
@@ -65,6 +66,7 @@ func Load() (*Config, error) {
 		NATSURL:         getEnv("NATS_URL", "nats://nats:4222"),
 		UserGRPCAddr:    getEnv("USER_GRPC_ADDR", "user-service:9091"),
 		ParkingGRPCAddr: getEnv("PARKING_GRPC_ADDR", "parking-service:9095"),
+		ParkingHTTPURL:  getEnv("PARKING_HTTP_URL", "http://parking-service:8085"),
 
 		CacheTTL: cacheTTL,
 	}, nil
