@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"payment-service/internal/domain"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/domain"
 )
 
 func TestCreatePaymentInputValidationErrors(t *testing.T) {

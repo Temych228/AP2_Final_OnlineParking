@@ -53,7 +53,7 @@ var (
 	ErrPaymentAlreadyPaid = errors.New("payment is already paid")
 )
 
-func (i CreatePaymentInput) Validate() error {
+func (i *CreatePaymentInput) Validate() error {
 	i.BookingID = strings.TrimSpace(i.BookingID)
 	i.Method = PaymentMethod(strings.TrimSpace(string(i.Method)))
 

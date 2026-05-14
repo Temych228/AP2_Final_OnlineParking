@@ -283,6 +283,78 @@
     </div>
 
     <div class="card">
+        <h2>Auth Actions</h2>
+        <label>Logout — Refresh Token</label>
+        <input id="logout_refresh_token" placeholder="refresh token" />
+        <button onclick="logoutUser()">Logout</button>
+
+        <label style="margin-top:12px">Forgot Password — Email</label>
+        <input id="forgot_email" placeholder="user@mail.com" />
+        <button class="secondary" onclick="forgotPassword()">Forgot Password</button>
+
+        <label style="margin-top:12px">Verify Email — Token</label>
+        <input id="verify_email_token" placeholder="verification token" />
+        <button class="secondary" onclick="verifyEmail()">Verify Email</button>
+
+        <label style="margin-top:12px">Change Password</label>
+        <input id="cp_user_id" placeholder="user id" />
+        <input id="cp_old_password" type="password" placeholder="old password" />
+        <input id="cp_new_password" type="password" placeholder="new password" />
+        <button class="secondary" onclick="changePassword()">Change Password</button>
+    </div>
+
+    <div class="card">
+        <h2>User Actions</h2>
+        <label>Check user by email</label>
+        <input id="check_user_email" placeholder="user@mail.com" />
+        <button onclick="checkUser()">Check Exists</button>
+
+        <label style="margin-top:12px">User Stats — User ID</label>
+        <input id="stats_user_id" list="users_list" placeholder="user id" />
+        <button class="secondary" onclick="getUserStats()">Get Stats</button>
+
+        <label style="margin-top:12px">Ban User</label>
+        <input id="ban_user_id" list="users_list" placeholder="user id" />
+        <input id="ban_reason" placeholder="reason" />
+        <button class="secondary" onclick="banUser()">Ban User</button>
+
+        <label style="margin-top:12px">Batch Users — one ID per line</label>
+        <textarea id="batch_ids" style="min-height:80px" placeholder="user-1&#10;user-2"></textarea>
+        <button class="secondary" onclick="getUsersBatch()">Get Batch</button>
+    </div>
+
+    <div class="card">
+        <h2>Notifications</h2>
+        <label>User ID</label>
+        <input id="notif_user_id" list="users_list" placeholder="user id" />
+        <label>Title</label>
+        <input id="notif_title" placeholder="Notification title" />
+        <label>Body</label>
+        <input id="notif_body" placeholder="Notification body" />
+        <label>Data (optional)</label>
+        <input id="notif_data" placeholder="extra meta" />
+        <button onclick="sendPushNotification()">Send Push</button>
+
+        <label style="margin-top:12px">History / Unread — User ID</label>
+        <input id="notif_history_user" list="users_list" placeholder="user id" />
+        <button class="secondary" onclick="getNotifHistory()">History</button>
+        <button class="secondary" onclick="getUnreadCount()">Unread Count</button>
+
+        <label style="margin-top:12px">Preferences — User ID</label>
+        <input id="notif_pref_user" list="users_list" placeholder="user id" />
+        <div class="row" style="margin-top:6px">
+            <label><input type="checkbox" id="notif_email_enabled" checked> Email</label>
+            <label><input type="checkbox" id="notif_sms_enabled"> SMS</label>
+        </div>
+        <div class="row">
+            <label><input type="checkbox" id="notif_push_enabled" checked> Push</label>
+            <label><input type="checkbox" id="notif_marketing"> Marketing</label>
+        </div>
+        <button class="secondary" onclick="updateNotifPreferences()">Update Preferences</button>
+        <button class="secondary" onclick="getNotifPreferences()">Get Preferences</button>
+    </div>
+
+    <div class="card">
         <h2>Output</h2>
         <textarea id="output" readonly></textarea>
     </div>
@@ -567,6 +639,87 @@
         return request('/api/payments', 'POST', {
             booking_id: document.getElementById('payment_booking_id').value.trim(),
             method: document.getElementById('payment_method').value
+        });
+    }
+
+    function logoutUser() {
+        const token = document.getElementById('logout_refresh_token').value.trim();
+        return request('/api/auth/logout', 'POST', { refresh_token: token });
+    }
+
+    function changePassword() {
+        return request('/api/auth/change-password', 'POST', {
+            user_id: document.getElementById('cp_user_id').value.trim(),
+            old_password: document.getElementById('cp_old_password').value,
+            new_password: document.getElementById('cp_new_password').value
+        });
+    }
+
+    function verifyEmail() {
+        return request('/api/auth/verify-email', 'POST', {
+            token: document.getElementById('verify_email_token').value.trim()
+        });
+    }
+
+    function forgotPassword() {
+        return request('/api/auth/forgot-password', 'POST', {
+            email: document.getElementById('forgot_email').value.trim()
+        });
+    }
+
+    function checkUser() {
+        const email = document.getElementById('check_user_email').value.trim();
+        return request(`/api/users/check?email=${encodeURIComponent(email)}`);
+    }
+
+    function getUserStats() {
+        const id = document.getElementById('stats_user_id').value.trim();
+        return request(`/api/users/${encodeURIComponent(id)}/stats`);
+    }
+
+    function banUser() {
+        const id = document.getElementById('ban_user_id').value.trim();
+        const reason = document.getElementById('ban_reason').value.trim();
+        return request(`/api/users/${encodeURIComponent(id)}/ban`, 'POST', { reason });
+    }
+
+    function getUsersBatch() {
+        const raw = document.getElementById('batch_ids').value.trim();
+        const ids = raw.split('\n').map(s => s.trim()).filter(Boolean);
+        return request('/api/users/batch', 'POST', { ids });
+    }
+
+    function sendPushNotification() {
+        return request('/api/notifications/push', 'POST', {
+            user_id: document.getElementById('notif_user_id').value.trim(),
+            title: document.getElementById('notif_title').value.trim(),
+            body: document.getElementById('notif_body').value.trim(),
+            data: document.getElementById('notif_data').value.trim()
+        });
+    }
+
+    function getNotifHistory() {
+        const uid = document.getElementById('notif_history_user').value.trim();
+        return request(`/api/notifications/history?user_id=${encodeURIComponent(uid)}&page=1&page_size=20`);
+    }
+
+    function getUnreadCount() {
+        const uid = document.getElementById('notif_history_user').value.trim();
+        return request(`/api/notifications/unread-count?user_id=${encodeURIComponent(uid)}`);
+    }
+
+    function getNotifPreferences() {
+        const uid = document.getElementById('notif_pref_user').value.trim();
+        return request(`/api/notifications/preferences?user_id=${encodeURIComponent(uid)}`);
+    }
+
+    function updateNotifPreferences() {
+        return request('/api/notifications/preferences', 'PUT', {
+            user_id: document.getElementById('notif_pref_user').value.trim(),
+            email_enabled: document.getElementById('notif_email_enabled').checked,
+            sms_enabled: document.getElementById('notif_sms_enabled').checked,
+            push_enabled: document.getElementById('notif_push_enabled').checked,
+            marketing_emails: document.getElementById('notif_marketing').checked
         });
     }
 

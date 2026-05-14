@@ -40,6 +40,12 @@ func (h *Handler) Register(router *gin.Engine) {
 		users.GET("/:id/stats", h.GetUserStats)
 		users.POST("/batch", h.GetUsersBatch)
 		users.GET("/check", h.CheckUserExists)
+		users.GET("/health", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		})
+		users.GET("/ready", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		})
 	}
 }
 

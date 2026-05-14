@@ -49,6 +49,7 @@ func (h *Handler) Register(router *gin.Engine) {
 	bookings.POST("", h.CreateBooking)
 	bookings.GET("", h.ListBookings)
 	bookings.GET("/:id", h.GetBooking)
+	bookings.GET("/health", h.Health)
 	bookings.POST("/:id/confirm", h.ConfirmBooking)
 	bookings.POST("/:id/cancel", h.CancelBooking)
 	bookings.POST("/:id/start", h.StartBooking)

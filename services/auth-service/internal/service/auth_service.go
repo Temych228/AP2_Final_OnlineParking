@@ -16,9 +16,27 @@ import (
 	"github.com/Temych228/AP2_Final_OnlineParking/services/auth-service/internal/repository"
 )
 
+type AuthRepo interface {
+	CreateUser(ctx context.Context, email, passwordHash string) (string, error)
+	GetUserByEmail(ctx context.Context, email string) (*repository.UserRecord, error)
+	GetUserByID(ctx context.Context, id string) (*repository.UserRecord, error)
+	MarkVerified(ctx context.Context, userID string) error
+	UpdatePassword(ctx context.Context, userID, newHash string) error
+	CreateRefreshToken(ctx context.Context, userID, token string, expiresAt time.Time) error
+	FindRefreshToken(ctx context.Context, token string) (string, time.Time, bool, error)
+	RevokeRefreshToken(ctx context.Context, token string) error
+	RevokeAllRefreshTokens(ctx context.Context, userID string) (int32, error)
+	StoreVerificationToken(ctx context.Context, userID, token string, expiresAt time.Time) error
+	GetVerificationToken(ctx context.Context, token string) (string, error)
+	DeleteVerificationToken(ctx context.Context, token string) error
+	StorePasswordResetToken(ctx context.Context, userID, token string, expiresAt time.Time) error
+	GetPasswordResetToken(ctx context.Context, token string) (string, error)
+	DeletePasswordResetToken(ctx context.Context, token string) error
+}
+
 type AuthService struct {
 	cfg       *config.Config
-	repo      *repository.AuthRepository
+	repo      AuthRepo
 	publisher *publisher.NATSPublisher
 }
 
@@ -30,7 +48,7 @@ type TokenPair struct {
 	Email        string
 }
 
-func New(cfg *config.Config, repo *repository.AuthRepository, pub *publisher.NATSPublisher) *AuthService {
+func New(cfg *config.Config, repo AuthRepo, pub *publisher.NATSPublisher) *AuthService {
 	return &AuthService{cfg: cfg, repo: repo, publisher: pub}
 }
 

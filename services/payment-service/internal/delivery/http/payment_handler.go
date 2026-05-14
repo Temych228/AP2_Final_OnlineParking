@@ -37,6 +37,8 @@ func (h *PaymentHandler) RegisterRoutes(router *gin.Engine) {
 		payments.GET("/:id", h.GetPayment)
 		payments.GET("/booking/:booking_id", h.GetPaymentByBooking)
 		payments.POST("/:id/cancel", h.CancelPayment)
+		payments.GET("/health", h.Health)
+		payments.GET("/ready", h.Health)
 	}
 }
 

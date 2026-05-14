@@ -1,0 +1,11 @@
+groups:
+  - name: online-parking-recording
+    rules:
+      - record: service:http_rps:5m
+        expr: sum(rate(http_requests_total[5m])) by (job)
+
+      - record: service:http_error_rate:5m
+        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) by (job) / sum(rate(http_requests_total[5m])) by (job)
+
+      - record: service:http_p95_latency_seconds:5m
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, job))

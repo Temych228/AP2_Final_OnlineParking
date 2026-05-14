@@ -263,6 +263,7 @@ func buildHTTPServer(
 	router.GET("/spots/:id", spotHandler.GetSpot)
 	router.GET("/parkings/:id/spots", spotHandler.GetSpotsByParking)
 	router.PATCH("/spots/:id/status", spotHandler.UpdateSpotStatus)
+	router.POST("/spots/:id/status", spotHandler.UpdateSpotStatus)
 	router.POST("/spots/:id/reserve", spotHandler.ReserveSpot)
 	router.POST("/spots/:id/release", spotHandler.ReleaseSpot)
 	router.DELETE("/spots/:id", spotHandler.DeleteSpot)

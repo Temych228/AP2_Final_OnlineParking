@@ -11,7 +11,6 @@ import (
 
 	"github.com/Temych228/AP2_Final_OnlineParking/services/notification-service/internal/config"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/notification-service/internal/domain"
-	"github.com/Temych228/AP2_Final_OnlineParking/services/notification-service/internal/repository"
 )
 
 type Hub struct {
@@ -66,13 +65,25 @@ func (h *Hub) Broadcast(n *domain.Notification) {
 	}
 }
 
+type NotificationRepo interface {
+	Create(ctx context.Context, n *domain.Notification) (*domain.Notification, error)
+	UpdateStatus(ctx context.Context, id string, status domain.NotificationStatus, sentAt *time.Time) error
+	ListHistory(ctx context.Context, userID string, page, pageSize int) ([]*domain.Notification, int, error)
+	MarkRead(ctx context.Context, notificationID, userID string) error
+	Delete(ctx context.Context, notificationID, userID string) error
+	UnreadCount(ctx context.Context, userID string) (int32, error)
+	GetPreferences(ctx context.Context, userID string) (*domain.Preferences, error)
+	UpsertPreferences(ctx context.Context, p *domain.Preferences) error
+	MarkEventProcessed(ctx context.Context, eventID string, ttl time.Duration) (bool, error)
+}
+
 type NotificationService struct {
 	cfg  *config.Config
-	repo *repository.NotificationRepository
+	repo NotificationRepo
 	hub  *Hub
 }
 
-func New(cfg *config.Config, repo *repository.NotificationRepository, hub *Hub) *NotificationService {
+func New(cfg *config.Config, repo NotificationRepo, hub *Hub) *NotificationService {
 	return &NotificationService{
 		cfg:  cfg,
 		repo: repo,
