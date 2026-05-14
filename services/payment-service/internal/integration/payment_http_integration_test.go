@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	httpdelivery "payment-service/internal/delivery/http"
-	"payment-service/internal/repository"
-	"payment-service/internal/service"
+	httpdelivery "github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/delivery/http"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/repository"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/service"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
@@ -98,7 +98,7 @@ func setupRouter(db *sql.DB) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 
 	paymentRepo := repository.NewPaymentRepository(db)
-	paymentService := service.NewPaymentService(paymentRepo, nil, nil, nil)
+	paymentService := service.NewPaymentService(paymentRepo, nil, nil, nil, nil)
 	paymentHandler := httpdelivery.NewPaymentHandler(paymentService)
 
 	router := gin.New()

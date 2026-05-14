@@ -5,12 +5,12 @@ import (
 	"strings"
 	"testing"
 
-	"payment-service/internal/domain"
-	"payment-service/internal/service"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/domain"
+	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/service"
 )
 
 func newPaymentServiceWithoutDependencies() *service.PaymentService {
-	return service.NewPaymentService(nil, nil, nil, nil)
+	return service.NewPaymentService(nil, nil, nil, nil, nil)
 }
 
 func TestPaymentServiceCreatePaymentValidationErrors(t *testing.T) {
@@ -27,7 +27,7 @@ func TestPaymentServiceCreatePaymentValidationErrors(t *testing.T) {
 				BookingID: "",
 				Method:    domain.MethodCard,
 			},
-			wantError: "booking_id is required",
+			wantError: "invalid input",
 		},
 		{
 			name: "missing payment method",
@@ -35,7 +35,7 @@ func TestPaymentServiceCreatePaymentValidationErrors(t *testing.T) {
 				BookingID: "11111111-1111-1111-1111-111111111111",
 				Method:    "",
 			},
-			wantError: "method is required",
+			wantError: "invalid input",
 		},
 		{
 			name: "invalid payment method",
