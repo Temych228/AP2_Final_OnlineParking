@@ -9,6 +9,7 @@ import (
 
 	"github.com/Temych228/AP2_Final_OnlineParking/services/notification-service/internal/domain"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/notification-service/internal/service"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type Handler struct {
@@ -62,6 +63,7 @@ func New(svc *service.NotificationService) *Handler {
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/health", h.health)
 	mux.HandleFunc("/ready", h.health)
+	mux.Handle("/metrics", promhttp.Handler())
 
 	mux.HandleFunc("/notifications/health", h.health)
 	mux.HandleFunc("/notifications/ready", h.health)

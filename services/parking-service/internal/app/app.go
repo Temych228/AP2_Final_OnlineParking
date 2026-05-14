@@ -19,6 +19,7 @@ import (
 	httpHandler "github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/delivery/http"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/repository"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/usecase"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	parkingv1 "github.com/Temych228/ap2_protos_go_final/parking/v1"
 	"github.com/gin-gonic/gin"
@@ -247,6 +248,12 @@ func buildHTTPServer(
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+
+	router.GET("/ready", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	router.POST("/parkings", parkingHandler.CreateParking)
 	router.GET("/parkings/:id", parkingHandler.GetParking)

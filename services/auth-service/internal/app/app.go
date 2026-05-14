@@ -16,6 +16,7 @@ import (
 	authv1 "github.com/Temych228/ap2_protos_go_final/auth/v1"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 )
@@ -73,6 +74,7 @@ func New(cfg *config.Config) (*App, error) {
 	authv1.RegisterAuthServiceServer(grpcSrv, grpcserver.New(svc))
 
 	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
 	httptransport.New(svc).Register(mux)
 
 	httpServer := &http.Server{

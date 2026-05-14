@@ -63,7 +63,7 @@ func (i *RegisterInput) Validate() error {
 	i.LastName = strings.TrimSpace(i.LastName)
 	i.Phone = strings.TrimSpace(i.Phone)
 
-	if i.Email == "" || i.Password == "" || i.FirstName == "" || i.LastName == "" || i.Phone == "" {
+	if i.Email == "" || i.Password == "" || i.FirstName == "" || i.LastName == "" {
 		return ErrInvalidInput
 	}
 

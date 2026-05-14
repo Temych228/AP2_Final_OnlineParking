@@ -6,23 +6,104 @@
     <title>Online Parking</title>
     <style>
         :root { color-scheme: dark; }
-        body { margin: 0; font-family: Arial, sans-serif; background: #0f172a; color: #e2e8f0; }
-        header { padding: 20px 24px; background: #111827; border-bottom: 1px solid #334155; }
-        h1 { margin: 0 0 6px; font-size: 24px; }
-        .wrap { padding: 20px 24px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
-        .card { background: #111827; border: 1px solid #334155; border-radius: 14px; padding: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.24); }
-        .card h2 { margin: 0 0 12px; font-size: 18px; }
-        label { display: block; font-size: 13px; margin: 10px 0 4px; color: #cbd5e1; }
-        input, select, button, textarea {
-            width: 100%; box-sizing: border-box; border-radius: 10px; border: 1px solid #475569;
-            background: #0b1220; color: #e2e8f0; padding: 10px 12px; font-size: 14px;
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
         }
-        button { cursor: pointer; background: #2563eb; border: 0; margin-top: 10px; }
-        button.secondary { background: #334155; }
-        textarea { min-height: 180px; resize: vertical; white-space: pre; }
-        .row { display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr); }
-        .small { font-size: 12px; color: #94a3b8; }
-        .stack { display: grid; gap: 10px; }
+        header {
+            padding: 20px 24px;
+            background: #111827;
+            border-bottom: 1px solid #334155;
+        }
+        h1 {
+            margin: 0 0 6px;
+            font-size: 24px;
+        }
+        .wrap {
+            padding: 20px 24px;
+            display: grid;
+            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            align-items: start;
+        }
+        .card {
+            background: #111827;
+            border: 1px solid #334155;
+            border-radius: 14px;
+            padding: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.24);
+        }
+        .card h2 {
+            margin: 0 0 12px;
+            font-size: 18px;
+        }
+        label {
+            display: block;
+            font-size: 13px;
+            margin: 10px 0 4px;
+            color: #cbd5e1;
+        }
+        input, select, button, textarea {
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid #475569;
+            background: #0b1220;
+            color: #e2e8f0;
+            padding: 10px 12px;
+            font-size: 14px;
+            outline: none;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 2px rgba(96,165,250,.15);
+        }
+        button {
+            cursor: pointer;
+            background: #2563eb;
+            border: 0;
+            margin-top: 10px;
+            font-weight: 600;
+        }
+        button.secondary {
+            background: #334155;
+        }
+        button:hover {
+            filter: brightness(1.05);
+        }
+        textarea {
+            min-height: 220px;
+            resize: vertical;
+            white-space: pre;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        }
+        .row {
+            display: grid;
+            gap: 10px;
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .small {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        .stack {
+            display: grid;
+            gap: 10px;
+        }
+        .hint {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #94a3b8;
+            line-height: 1.45;
+        }
+        code {
+            background: #0b1220;
+            padding: 2px 6px;
+            border-radius: 6px;
+            border: 1px solid #334155;
+        }
     </style>
 </head>
 <body>
@@ -36,12 +117,12 @@
         <h2>Gateway / Service health</h2>
         <div class="stack">
             <button onclick="ping('/health')">Ping gateway</button>
-            <button class="secondary" onclick="ping('/api/notifications/health')">Ping notification</button>
-            <button class="secondary" onclick="ping('/api/parking/health')">Ping parking</button>
-            <button class="secondary" onclick="ping('/api/users/health')">Ping users</button>
-            <button class="secondary" onclick="ping('/api/bookings/health')">Ping booking</button>
-            <button class="secondary" onclick="ping('/api/payments/health')">Ping payment</button>
             <button class="secondary" onclick="ping('/api/auth/health')">Ping auth</button>
+            <button class="secondary" onclick="ping('/api/users/health')">Ping users</button>
+            <button class="secondary" onclick="ping('/api/notifications/health')">Ping notification</button>
+            <button class="secondary" onclick="ping('/api/bookings/health')">Ping booking</button>
+            <button class="secondary" onclick="ping('/api/parking/health')">Ping parking</button>
+            <button class="secondary" onclick="ping('/api/payments/health')">Ping payment</button>
         </div>
     </div>
 
@@ -50,18 +131,18 @@
         <label>Email</label>
         <input id="reg_email" placeholder="user@mail.com" />
         <label>Password</label>
-        <input id="reg_password" type="password" placeholder="password" />
+        <input id="reg_password" type="password" placeholder="Password123!" />
         <div class="row">
             <div>
                 <label>First name</label>
-                <input id="reg_first_name" placeholder="Aruzhan" />
+                <input id="reg_first_name" placeholder="Artyom" />
             </div>
             <div>
                 <label>Last name</label>
-                <input id="reg_last_name" placeholder="S" />
+                <input id="reg_last_name" placeholder="Safaryan" />
             </div>
         </div>
-        <label>Phone</label>
+        <label>Phone (optional)</label>
         <input id="reg_phone" placeholder="+77001234567" />
         <button onclick="registerUser()">Register</button>
     </div>
@@ -82,14 +163,14 @@
         <div class="row">
             <div>
                 <label>First name</label>
-                <input id="user_first_name" placeholder="Aruzhan" />
+                <input id="user_first_name" placeholder="Artyom" />
             </div>
             <div>
                 <label>Last name</label>
-                <input id="user_last_name" placeholder="S" />
+                <input id="user_last_name" placeholder="Safaryan" />
             </div>
         </div>
-        <label>Phone</label>
+        <label>Phone (optional)</label>
         <input id="user_phone" placeholder="+77001234567" />
         <label>Role</label>
         <select id="user_role">
@@ -97,6 +178,7 @@
             <option value="admin">admin</option>
         </select>
         <button onclick="createUser()">Create</button>
+        <button class="secondary" onclick="loadUsers()">Refresh users list</button>
     </div>
 
     <div class="card">
@@ -106,7 +188,7 @@
         <label>Address</label>
         <input id="parking_address" placeholder="City center" />
         <label>Total spots</label>
-        <input id="parking_total_spots" type="number" value="10" />
+        <input id="parking_total_spots" type="number" value="10" min="1" />
         <button onclick="createParking()">Create parking</button>
         <button class="secondary" onclick="getParkings()">List parkings</button>
     </div>
@@ -116,37 +198,70 @@
         <label>Parking ID</label>
         <input id="tariff_parking_id" type="number" placeholder="1" />
         <label>Hours</label>
-        <input id="tariff_hours" type="number" value="1" />
+        <input id="tariff_hours" type="number" value="1" min="1" />
         <button onclick="calculateTariff()">Calculate price</button>
     </div>
 
     <div class="card">
         <h2>Create booking</h2>
-        <label>User ID</label>
-        <input id="booking_user_id" placeholder="user-id" />
-        <label>Parking ID</label>
-        <input id="booking_parking_id" type="number" placeholder="1" />
+
+        <label>User</label>
+        <input id="booking_user_id" list="users_list" placeholder="Start typing user id..." />
+        <datalist id="users_list"></datalist>
+
+        <label>Parking</label>
+        <input id="booking_parking_id" list="parkings_list" placeholder="Start typing parking id..." />
+        <datalist id="parkings_list"></datalist>
+
         <label>Vehicle plate</label>
         <input id="booking_vehicle_plate" placeholder="777ABC01" />
+
         <div class="row">
             <div>
                 <label>Start time</label>
-                <input id="booking_start_time" />
+                <input id="booking_start_time" type="datetime-local" />
             </div>
             <div>
                 <label>End time</label>
-                <input id="booking_end_time" />
+                <input id="booking_end_time" type="datetime-local" />
             </div>
         </div>
-        <label>Spot ID (optional, leave empty for random spot)</label>
-        <input id="booking_spot_id" type="number" placeholder="0" />
+
+        <label>Spot ID (optional)</label>
+        <input id="booking_spot_id" type="number" placeholder="leave empty" />
+
+        <label>Hours for quick booking</label>
+        <input id="booking_hours" type="number" value="1" min="1" />
+
         <button onclick="createBooking()">Create booking</button>
+        <button class="secondary" onclick="createQuickBooking()">Quick booking</button>
+
+        <div class="hint">
+            Печатай вручную или выбирай из подсказок. После загрузки users/parkings список подскажет id.
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Bookings list</h2>
+        <div class="row">
+            <div>
+                <label>User ID filter</label>
+                <input id="bookings_filter_user_id" placeholder="optional" />
+            </div>
+            <div>
+                <label>Status filter</label>
+                <input id="bookings_filter_status" placeholder="optional" />
+            </div>
+        </div>
+        <button onclick="listBookings()">List bookings</button>
+        <button class="secondary" onclick="loadBookings()">Refresh booking ids</button>
+        <datalist id="bookings_list"></datalist>
     </div>
 
     <div class="card">
         <h2>Booking actions</h2>
         <label>Booking ID</label>
-        <input id="booking_action_id" placeholder="booking-id" />
+        <input id="booking_action_id" list="bookings_list" placeholder="booking-id" />
         <button onclick="confirmBooking()">Confirm</button>
         <button class="secondary" onclick="startBooking()">Start</button>
         <button class="secondary" onclick="completeBooking()">Complete</button>
@@ -156,7 +271,7 @@
     <div class="card">
         <h2>Payment</h2>
         <label>Booking ID</label>
-        <input id="payment_booking_id" placeholder="booking-id" />
+        <input id="payment_booking_id" list="bookings_list" placeholder="booking-id" />
         <label>Method</label>
         <select id="payment_method">
             <option value="card">card</option>
@@ -176,14 +291,43 @@
 <script>
     const out = document.getElementById('output');
 
-    function nowPlus(hours) {
-        const d = new Date();
-        d.setHours(d.getHours() + hours);
-        return d.toISOString();
+    let usersCache = [];
+    let parkingsCache = [];
+    let bookingsCache = [];
+
+    function setOutput(obj) {
+        out.value = JSON.stringify(obj, null, 2);
     }
 
-    document.getElementById('booking_start_time').value = nowPlus(1);
-    document.getElementById('booking_end_time').value = nowPlus(2);
+    function toDateTimeLocalValue(date) {
+        const pad = (n) => String(n).padStart(2, '0');
+        const y = date.getFullYear();
+        const m = pad(date.getMonth() + 1);
+        const d = pad(date.getDate());
+        const h = pad(date.getHours());
+        const min = pad(date.getMinutes());
+        return `${y}-${m}-${d}T${h}:${min}`;
+    }
+
+    function nowPlusHours(hours) {
+        const d = new Date();
+        d.setHours(d.getHours() + hours);
+        return toDateTimeLocalValue(d);
+    }
+
+    document.getElementById('booking_start_time').value = nowPlusHours(1);
+    document.getElementById('booking_end_time').value = nowPlusHours(2);
+
+    function fillDatalist(listId, items, getValue, getLabel) {
+        const list = document.getElementById(listId);
+        list.innerHTML = '';
+        for (const item of items) {
+            const opt = document.createElement('option');
+            opt.value = String(getValue(item));
+            opt.label = getLabel ? String(getLabel(item)) : '';
+            list.appendChild(opt);
+        }
+    }
 
     async function request(path, method = 'GET', body = null) {
         const res = await fetch(path, {
@@ -194,28 +338,92 @@
 
         const text = await res.text();
         let data = text;
-        try { data = text ? JSON.parse(text) : null; } catch (_) {}
-        out.value = JSON.stringify({
+        try {
+            data = text ? JSON.parse(text) : null;
+        } catch (_) {}
+
+        setOutput({
             path,
             status: res.status,
             ok: res.ok,
             data
-        }, null, 2);
+        });
+
+        if (!res.ok) {
+            const message =
+                (data && typeof data === 'object' && (data.error || data.message)) ||
+                (typeof data === 'string' && data.trim()) ||
+                `Request failed with status ${res.status}`;
+            alert(message);
+        }
+
         return { res, data };
+    }
+
+    function normalizeItems(data) {
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data?.items)) return data.items;
+        if (Array.isArray(data?.data)) return data.data;
+        return [];
+    }
+
+    async function loadUsers() {
+        const { data } = await request('/api/users');
+        const items = normalizeItems(data);
+        usersCache = items;
+        fillDatalist(
+            'users_list',
+            items,
+            (u) => u.id,
+            (u) => `${u.first_name || ''} ${u.last_name || ''} — ${u.email || ''}`.trim()
+        );
+        return items;
+    }
+
+    async function loadParkings() {
+        const { data } = await request('/api/parking/parkings');
+        const items = normalizeItems(data);
+        parkingsCache = items;
+        fillDatalist(
+            'parkings_list',
+            items,
+            (p) => p.id,
+            (p) => `${p.id} — ${p.name || ''}`
+        );
+        return items;
+    }
+
+    async function loadBookings() {
+        const { data } = await request('/api/bookings');
+        const items = normalizeItems(data);
+        bookingsCache = items;
+        fillDatalist(
+            'bookings_list',
+            items,
+            (b) => b.id,
+            (b) => `${b.id} — ${b.status || ''} — ${b.vehicle_plate || ''}`
+        );
+        return items;
     }
 
     function ping(path) {
         return request(path);
     }
 
-    function registerUser() {
-        return request('/api/auth/register', 'POST', {
+    async function registerUser() {
+        const result = await request('/api/auth/register', 'POST', {
             email: document.getElementById('reg_email').value.trim(),
             password: document.getElementById('reg_password').value,
             first_name: document.getElementById('reg_first_name').value.trim(),
             last_name: document.getElementById('reg_last_name').value.trim(),
             phone: document.getElementById('reg_phone').value.trim()
         });
+
+        if (result.res.ok) {
+            await loadUsers();
+        }
+
+        return result;
     }
 
     function loginUser() {
@@ -225,22 +433,34 @@
         });
     }
 
-    function createUser() {
-        return request('/api/users/', 'POST', {
+    async function createUser() {
+        const result = await request('/api/users', 'POST', {
             email: document.getElementById('user_email').value.trim(),
             first_name: document.getElementById('user_first_name').value.trim(),
             last_name: document.getElementById('user_last_name').value.trim(),
             phone: document.getElementById('user_phone').value.trim(),
             role: document.getElementById('user_role').value
         });
+
+        if (result.res.ok) {
+            await loadUsers();
+        }
+
+        return result;
     }
 
-    function createParking() {
-        return request('/api/parking/parkings', 'POST', {
+    async function createParking() {
+        const result = await request('/api/parking/parkings', 'POST', {
             name: document.getElementById('parking_name').value.trim(),
             address: document.getElementById('parking_address').value.trim(),
             total_spots: Number(document.getElementById('parking_total_spots').value || 0)
         });
+
+        if (result.res.ok) {
+            await loadParkings();
+        }
+
+        return result;
     }
 
     function getParkings() {
@@ -253,50 +473,120 @@
         return request(`/api/parking/tariffs/${encodeURIComponent(parkingId)}/calculate?hours=${encodeURIComponent(hours)}`);
     }
 
-    function createBooking() {
-        const spotValue = document.getElementById('booking_spot_id').value.trim();
-        return request('/api/bookings/', 'POST', {
+    function buildBookingPayload(includeOptionalSpot = true) {
+        const payload = {
             user_id: document.getElementById('booking_user_id').value.trim(),
-            parking_id: Number(document.getElementById('booking_parking_id').value || 0),
-            spot_id: spotValue ? Number(spotValue) : 0,
+            parking_id: Number(document.getElementById('booking_parking_id').value.trim() || 0),
             vehicle_plate: document.getElementById('booking_vehicle_plate').value.trim(),
-            start_time: document.getElementById('booking_start_time').value,
-            end_time: document.getElementById('booking_end_time').value
+            start_time: new Date(document.getElementById('booking_start_time').value).toISOString(),
+            end_time: new Date(document.getElementById('booking_end_time').value).toISOString()
+        };
+
+        if (includeOptionalSpot) {
+            const spotValue = document.getElementById('booking_spot_id').value.trim();
+            if (spotValue) {
+                payload.spot_id = Number(spotValue);
+            }
+        }
+
+        return payload;
+    }
+
+    async function createBooking() {
+        const result = await request('/api/bookings', 'POST', buildBookingPayload(true));
+        if (result.res.ok) {
+            await loadBookings();
+        }
+        return result;
+    }
+
+    async function createQuickBooking() {
+        const result = await request('/api/bookings/quick', 'POST', {
+            user_id: document.getElementById('booking_user_id').value.trim(),
+            parking_id: Number(document.getElementById('booking_parking_id').value.trim() || 0),
+            vehicle_plate: document.getElementById('booking_vehicle_plate').value.trim(),
+            hours: Number(document.getElementById('booking_hours').value || 1)
         });
+
+        if (result.res.ok) {
+            await loadBookings();
+        }
+
+        return result;
     }
 
-    function confirmBooking() {
-        const id = document.getElementById('booking_action_id').value.trim();
-        return request(`/api/bookings/${encodeURIComponent(id)}/confirm`, 'POST');
+    function listBookings() {
+        const userId = document.getElementById('bookings_filter_user_id').value.trim();
+        const status = document.getElementById('bookings_filter_status').value.trim();
+
+        const params = new URLSearchParams();
+        if (userId) params.set('user_id', userId);
+        if (status) params.set('status', status);
+
+        const qs = params.toString();
+        return request(`/api/bookings${qs ? `?${qs}` : ''}`);
     }
 
-    function startBooking() {
-        const id = document.getElementById('booking_action_id').value.trim();
-        return request(`/api/bookings/${encodeURIComponent(id)}/start`, 'POST');
+    async function confirmBooking() {
+        const result = await request(`/api/bookings/${encodeURIComponent(document.getElementById('booking_action_id').value.trim())}/confirm`, 'POST');
+        if (result.res.ok) {
+            await loadBookings();
+        }
+        return result;
     }
 
-    function completeBooking() {
-        const id = document.getElementById('booking_action_id').value.trim();
-        return request(`/api/bookings/${encodeURIComponent(id)}/complete`, 'POST');
+    async function startBooking() {
+        const result = await request(`/api/bookings/${encodeURIComponent(document.getElementById('booking_action_id').value.trim())}/start`, 'POST');
+        if (result.res.ok) {
+            await loadBookings();
+        }
+        return result;
     }
 
-    function cancelBooking() {
-        const id = document.getElementById('booking_action_id').value.trim();
-        return request(`/api/bookings/${encodeURIComponent(id)}/cancel`, 'POST', {
+    async function completeBooking() {
+        const result = await request(`/api/bookings/${encodeURIComponent(document.getElementById('booking_action_id').value.trim())}/complete`, 'POST');
+        if (result.res.ok) {
+            await loadBookings();
+        }
+        return result;
+    }
+
+    async function cancelBooking() {
+        const result = await request(`/api/bookings/${encodeURIComponent(document.getElementById('booking_action_id').value.trim())}/cancel`, 'POST', {
             reason: 'cancelled from frontend'
         });
+
+        if (result.res.ok) {
+            await loadBookings();
+        }
+
+        return result;
     }
 
     function createPayment() {
-        return request('/api/payments/', 'POST', {
+        return request('/api/payments', 'POST', {
             booking_id: document.getElementById('payment_booking_id').value.trim(),
             method: document.getElementById('payment_method').value
         });
     }
 
     function listPayments() {
-        return request('/api/payments/');
+        return request('/api/payments');
     }
+
+    async function init() {
+        try {
+            await Promise.allSettled([
+                loadUsers(),
+                loadParkings(),
+                loadBookings()
+            ]);
+        } catch (e) {
+            setOutput({ error: String(e) });
+        }
+    }
+
+    init();
 </script>
 </body>
 </html>

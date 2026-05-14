@@ -10,6 +10,7 @@ import (
 	"github.com/Temych228/AP2_Final_OnlineParking/services/user-service/internal/domain"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/user-service/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type Handler struct {
@@ -23,6 +24,7 @@ func New(svc *service.UserService) *Handler {
 func (h *Handler) Register(router *gin.Engine) {
 	router.GET("/health", h.Health)
 	router.GET("/ready", h.Health)
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	users := router.Group("/users")
 	{

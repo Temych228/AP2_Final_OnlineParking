@@ -54,7 +54,7 @@ func (i *CreateInput) Validate() error {
 	i.LastName = strings.TrimSpace(i.LastName)
 	i.Phone = strings.TrimSpace(i.Phone)
 
-	if i.Email == "" || i.FirstName == "" || i.LastName == "" || i.Phone == "" {
+	if i.Email == "" || i.FirstName == "" || i.LastName == "" {
 		return ErrInvalidInput
 	}
 
@@ -74,7 +74,7 @@ func (i *UpdateInput) Validate() error {
 	i.LastName = strings.TrimSpace(i.LastName)
 	i.Phone = strings.TrimSpace(i.Phone)
 
-	if i.FirstName == "" || i.LastName == "" || i.Phone == "" {
+	if i.FirstName == "" || i.LastName == "" {
 		return ErrInvalidInput
 	}
 

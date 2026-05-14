@@ -221,21 +221,28 @@ func (s *NotificationService) createAndDeliver(ctx context.Context, userID, to s
 
 func (s *NotificationService) sendSMTP(to, subject, body string) error {
 	if strings.TrimSpace(s.cfg.SMTPHost) == "" || strings.TrimSpace(s.cfg.SMTPFrom) == "" {
-		return nil
+		return fmt.Errorf("smtp is not configured")
 	}
 
 	addr := fmt.Sprintf("%s:%d", s.cfg.SMTPHost, s.cfg.SMTPPort)
 	auth := smtp.PlainAuth("", s.cfg.SMTPUsername, s.cfg.SMTPPassword, s.cfg.SMTPHost)
 
 	msg := []byte(
-		"To: " + to + "\r\n" +
+		"From: " + s.cfg.SMTPFrom + "\r\n" +
+			"To: " + to + "\r\n" +
 			"Subject: " + subject + "\r\n" +
+			"Date: " + time.Now().Format(time.RFC1123Z) + "\r\n" +
 			"MIME-Version: 1.0\r\n" +
-			"Content-Type: text/plain; charset=UTF-8\r\n\r\n" +
-			body,
+			"Content-Type: text/plain; charset=UTF-8\r\n" +
+			"\r\n" +
+			body + "\r\n",
 	)
 
-	return smtp.SendMail(addr, auth, s.cfg.SMTPFrom, []string{to}, msg)
+	if err := smtp.SendMail(addr, auth, s.cfg.SMTPFrom, []string{to}, msg); err != nil {
+		return fmt.Errorf("smtp send failed: %w", err)
+	}
+
+	return nil
 }
 
 func (s *NotificationService) handleUserRegistered(ctx context.Context, payload []byte) error {

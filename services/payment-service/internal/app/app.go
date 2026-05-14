@@ -13,6 +13,7 @@ import (
 	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/publisher"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/repository"
 	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/service"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
@@ -69,6 +70,7 @@ func (a *App) Run() error {
 	paymentService.SetCache(a.cache)
 
 	router := gin.Default()
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 	paymentHandler := httpdelivery.NewPaymentHandler(paymentService)
 	paymentHandler.RegisterRoutes(router)
 
