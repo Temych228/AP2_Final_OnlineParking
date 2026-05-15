@@ -80,9 +80,12 @@
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         }
         .row {
-            display: grid;
+            display: flex;
+            flex-wrap: wrap;
             gap: 10px;
-            grid-template-columns: repeat(2, 1fr);
+        }
+        .row > * {
+            flex: 1 1 140px;
         }
         .small {
             font-size: 12px;
@@ -157,31 +160,6 @@
     </div>
 
     <div class="card">
-        <h2>Create user</h2>
-        <label>Email</label>
-        <input id="user_email" placeholder="user@mail.com" />
-        <div class="row">
-            <div>
-                <label>First name</label>
-                <input id="user_first_name" placeholder="Artyom" />
-            </div>
-            <div>
-                <label>Last name</label>
-                <input id="user_last_name" placeholder="Safaryan" />
-            </div>
-        </div>
-        <label>Phone (optional)</label>
-        <input id="user_phone" placeholder="+77001234567" />
-        <label>Role</label>
-        <select id="user_role">
-            <option value="user" selected>user</option>
-            <option value="admin">admin</option>
-        </select>
-        <button onclick="createUser()">Create</button>
-        <button class="secondary" onclick="loadUsers()">Refresh users list</button>
-    </div>
-
-    <div class="card">
         <h2>Parking</h2>
         <label>Name</label>
         <input id="parking_name" placeholder="Parking A" />
@@ -191,6 +169,41 @@
         <input id="parking_total_spots" type="number" value="10" min="1" />
         <button onclick="createParking()">Create parking</button>
         <button class="secondary" onclick="getParkings()">List parkings</button>
+
+        <label style="margin-top:12px">Get Parking by ID</label>
+        <input id="parking_id" list="parkings_list" placeholder="1" />
+        <button class="secondary" onclick="getParkingById()">Get Parking</button>
+    </div>
+
+    <div class="card">
+        <h2>Parking Spots</h2>
+        <label>Parking ID</label>
+        <input id="spot_parking_id" list="parkings_list" placeholder="1" />
+        <label>Spot Number</label>
+        <input id="spot_number" placeholder="A1" />
+
+        <button onclick="createSpot()">Create spot</button>
+        <button class="secondary" onclick="getSpotsByParking()">List spots by Parking</button>
+    </div>
+
+    <div class="card">
+        <h2>Spot Actions</h2>
+        <label>Spot ID</label>
+        <input id="action_spot_id" placeholder="1" />
+
+        <div class="row">
+            <button class="secondary" onclick="getSpot()">Get Spot</button>
+            <button class="secondary" onclick="deleteSpot()">Delete Spot</button>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+            <button class="secondary" onclick="reserveSpot()">Reserve</button>
+            <button class="secondary" onclick="releaseSpot()">Release</button>
+        </div>
+
+        <label style="margin-top:12px">Update Status</label>
+        <input id="action_spot_status" placeholder="AVAILABLE / OCCUPIED / MAINTENANCE" />
+        <button class="secondary" onclick="updateSpotStatus()">Update Status</button>
     </div>
 
     <div class="card">
@@ -204,7 +217,6 @@
 
     <div class="card">
         <h2>Create booking</h2>
-
         <label>User</label>
         <input id="booking_user_id" list="users_list" placeholder="Start typing user id..." />
         <datalist id="users_list"></datalist>
@@ -228,43 +240,41 @@
         </div>
 
         <label>Spot ID (optional)</label>
-        <input id="booking_spot_id" type="number" placeholder="leave empty" />
+        <input id="booking_spot_id" type="number" placeholder="leave empty to auto-assign" />
 
         <label>Hours for quick booking</label>
         <input id="booking_hours" type="number" value="1" min="1" />
 
         <button onclick="createBooking()">Create booking</button>
         <button class="secondary" onclick="createQuickBooking()">Quick booking</button>
-
-        <div class="hint">
-            Печатай вручную или выбирай из подсказок. После загрузки users/parkings список подскажет id.
-        </div>
     </div>
 
     <div class="card">
-        <h2>Bookings list</h2>
+        <h2>Bookings list & Actions</h2>
         <div class="row">
             <div>
-                <label>User ID filter</label>
+                <label>User ID</label>
                 <input id="bookings_filter_user_id" placeholder="optional" />
             </div>
             <div>
-                <label>Status filter</label>
+                <label>Status</label>
                 <input id="bookings_filter_status" placeholder="optional" />
             </div>
         </div>
         <button onclick="listBookings()">List bookings</button>
         <button class="secondary" onclick="loadBookings()">Refresh booking ids</button>
         <datalist id="bookings_list"></datalist>
-    </div>
 
-    <div class="card">
-        <h2>Booking actions</h2>
-        <label>Booking ID</label>
+        <label style="margin-top:12px">Booking ID</label>
         <input id="booking_action_id" list="bookings_list" placeholder="booking-id" />
-        <button onclick="confirmBooking()">Confirm</button>
-        <button class="secondary" onclick="startBooking()">Start</button>
-        <button class="secondary" onclick="completeBooking()">Complete</button>
+        <div class="row">
+            <button class="secondary" onclick="getBooking()">Get</button>
+            <button class="secondary" onclick="confirmBooking()">Confirm</button>
+        </div>
+        <div class="row" style="margin-top:10px">
+            <button class="secondary" onclick="startBooking()">Start</button>
+            <button class="secondary" onclick="completeBooking()">Complete</button>
+        </div>
         <button class="secondary" onclick="cancelBooking()">Cancel</button>
     </div>
 
@@ -280,6 +290,31 @@
         </select>
         <button onclick="createPayment()">Create payment</button>
         <button class="secondary" onclick="listPayments()">List payments</button>
+    </div>
+
+    <div class="card">
+        <h2>Create / Admin User</h2>
+        <label>Email</label>
+        <input id="user_email" placeholder="user@mail.com" />
+        <div class="row">
+            <div>
+                <label>First name</label>
+                <input id="user_first_name" placeholder="Artyom" />
+            </div>
+            <div>
+                <label>Last name</label>
+                <input id="user_last_name" placeholder="Safaryan" />
+            </div>
+        </div>
+        <label>Phone (optional)</label>
+        <input id="user_phone" placeholder="+77001234567" />
+        <label>Role</label>
+        <select id="user_role">
+            <option value="user" selected>user</option>
+            <option value="admin">admin</option>
+        </select>
+        <button onclick="createUser()">Create</button>
+        <button class="secondary" onclick="loadUsers()">Refresh users list</button>
     </div>
 
     <div class="card">
@@ -321,37 +356,6 @@
         <label style="margin-top:12px">Batch Users — one ID per line</label>
         <textarea id="batch_ids" style="min-height:80px" placeholder="user-1&#10;user-2"></textarea>
         <button class="secondary" onclick="getUsersBatch()">Get Batch</button>
-    </div>
-
-    <div class="card">
-        <h2>Notifications</h2>
-        <label>User ID</label>
-        <input id="notif_user_id" list="users_list" placeholder="user id" />
-        <label>Title</label>
-        <input id="notif_title" placeholder="Notification title" />
-        <label>Body</label>
-        <input id="notif_body" placeholder="Notification body" />
-        <label>Data (optional)</label>
-        <input id="notif_data" placeholder="extra meta" />
-        <button onclick="sendPushNotification()">Send Push</button>
-
-        <label style="margin-top:12px">History / Unread — User ID</label>
-        <input id="notif_history_user" list="users_list" placeholder="user id" />
-        <button class="secondary" onclick="getNotifHistory()">History</button>
-        <button class="secondary" onclick="getUnreadCount()">Unread Count</button>
-
-        <label style="margin-top:12px">Preferences — User ID</label>
-        <input id="notif_pref_user" list="users_list" placeholder="user id" />
-        <div class="row" style="margin-top:6px">
-            <label><input type="checkbox" id="notif_email_enabled" checked> Email</label>
-            <label><input type="checkbox" id="notif_sms_enabled"> SMS</label>
-        </div>
-        <div class="row">
-            <label><input type="checkbox" id="notif_push_enabled" checked> Push</label>
-            <label><input type="checkbox" id="notif_marketing"> Marketing</label>
-        </div>
-        <button class="secondary" onclick="updateNotifPreferences()">Update Preferences</button>
-        <button class="secondary" onclick="getNotifPreferences()">Get Preferences</button>
     </div>
 
     <div class="card">
@@ -482,56 +486,13 @@
         return request(path);
     }
 
-    async function registerUser() {
-        const result = await request('/api/auth/register', 'POST', {
-            email: document.getElementById('reg_email').value.trim(),
-            password: document.getElementById('reg_password').value,
-            first_name: document.getElementById('reg_first_name').value.trim(),
-            last_name: document.getElementById('reg_last_name').value.trim(),
-            phone: document.getElementById('reg_phone').value.trim()
-        });
-
-        if (result.res.ok) {
-            await loadUsers();
-        }
-
-        return result;
-    }
-
-    function loginUser() {
-        return request('/api/auth/login', 'POST', {
-            email: document.getElementById('login_email').value.trim(),
-            password: document.getElementById('login_password').value
-        });
-    }
-
-    async function createUser() {
-        const result = await request('/api/users', 'POST', {
-            email: document.getElementById('user_email').value.trim(),
-            first_name: document.getElementById('user_first_name').value.trim(),
-            last_name: document.getElementById('user_last_name').value.trim(),
-            phone: document.getElementById('user_phone').value.trim(),
-            role: document.getElementById('user_role').value
-        });
-
-        if (result.res.ok) {
-            await loadUsers();
-        }
-
-        return result;
-    }
-
     async function createParking() {
         const result = await request('/api/parking/parkings', 'POST', {
             name: document.getElementById('parking_name').value.trim(),
             address: document.getElementById('parking_address').value.trim(),
             total_spots: Number(document.getElementById('parking_total_spots').value || 0)
         });
-
-        if (result.res.ok) {
-            await loadParkings();
-        }
-
+        if (result.res.ok) await loadParkings();
         return result;
     }
 
@@ -539,12 +500,62 @@
         return request('/api/parking/parkings');
     }
 
+    function getParkingById() {
+        const id = document.getElementById('parking_id').value.trim();
+        return request(`/api/parking/parkings/${encodeURIComponent(id)}`);
+    }
+
+    function createSpot() {
+        return request('/api/parking/spots', 'POST', {
+            parking_id: Number(document.getElementById('spot_parking_id').value.trim()),
+            number: document.getElementById('spot_number').value.trim()
+        });
+    }
+
+    function getSpotsByParking() {
+        const pid = document.getElementById('spot_parking_id').value.trim();
+        return request(`/api/parking/parkings/${encodeURIComponent(pid)}/spots`);
+    }
+
+    function getSpot() {
+        const id = document.getElementById('action_spot_id').value.trim();
+        return request(`/api/parking/spots/${encodeURIComponent(id)}`);
+    }
+
+    function deleteSpot() {
+        const id = document.getElementById('action_spot_id').value.trim();
+        return request(`/api/parking/spots/${encodeURIComponent(id)}`, 'DELETE');
+    }
+
+    function reserveSpot() {
+        const id = document.getElementById('action_spot_id').value.trim();
+        return request(`/api/parking/spots/${encodeURIComponent(id)}/reserve`, 'POST');
+    }
+
+    function releaseSpot() {
+        const id = document.getElementById('action_spot_id').value.trim();
+        return request(`/api/parking/spots/${encodeURIComponent(id)}/release`, 'POST');
+    }
+
+    function updateSpotStatus() {
+        const id = document.getElementById('action_spot_id').value.trim();
+        const status = document.getElementById('action_spot_status').value.trim();
+        // В зависимости от реализации бека это может быть PUT или PATCH. В коде ожидается JSON.
+        return request(`/api/parking/spots/${encodeURIComponent(id)}/status`, 'PUT', { status });
+    }
+
+    // ==========================================
+    // TARIFF FUNCTIONS
+    // ==========================================
     function calculateTariff() {
         const parkingId = document.getElementById('tariff_parking_id').value.trim();
         const hours = document.getElementById('tariff_hours').value.trim();
         return request(`/api/parking/tariffs/${encodeURIComponent(parkingId)}/calculate?hours=${encodeURIComponent(hours)}`);
     }
 
+    // ==========================================
+    // BOOKING FUNCTIONS
+    // ==========================================
     function buildBookingPayload(includeOptionalSpot = true) {
         const payload = {
             user_id: document.getElementById('booking_user_id').value.trim(),
@@ -566,9 +577,7 @@
 
     async function createBooking() {
         const result = await request('/api/bookings', 'POST', buildBookingPayload(true));
-        if (result.res.ok) {
-            await loadBookings();
-        }
+        if (result.res.ok) await loadBookings();
         return result;
     }
 
@@ -579,47 +588,40 @@
             vehicle_plate: document.getElementById('booking_vehicle_plate').value.trim(),
             hours: Number(document.getElementById('booking_hours').value || 1)
         });
-
-        if (result.res.ok) {
-            await loadBookings();
-        }
-
+        if (result.res.ok) await loadBookings();
         return result;
     }
 
     function listBookings() {
         const userId = document.getElementById('bookings_filter_user_id').value.trim();
         const status = document.getElementById('bookings_filter_status').value.trim();
-
         const params = new URLSearchParams();
         if (userId) params.set('user_id', userId);
         if (status) params.set('status', status);
-
         const qs = params.toString();
         return request(`/api/bookings${qs ? `?${qs}` : ''}`);
     }
 
+    function getBooking() {
+        const id = document.getElementById('booking_action_id').value.trim();
+        return request(`/api/bookings/${encodeURIComponent(id)}`);
+    }
+
     async function confirmBooking() {
         const result = await request(`/api/bookings/${encodeURIComponent(document.getElementById('booking_action_id').value.trim())}/confirm`, 'POST');
-        if (result.res.ok) {
-            await loadBookings();
-        }
+        if (result.res.ok) await loadBookings();
         return result;
     }
 
     async function startBooking() {
         const result = await request(`/api/bookings/${encodeURIComponent(document.getElementById('booking_action_id').value.trim())}/start`, 'POST');
-        if (result.res.ok) {
-            await loadBookings();
-        }
+        if (result.res.ok) await loadBookings();
         return result;
     }
 
     async function completeBooking() {
         const result = await request(`/api/bookings/${encodeURIComponent(document.getElementById('booking_action_id').value.trim())}/complete`, 'POST');
-        if (result.res.ok) {
-            await loadBookings();
-        }
+        if (result.res.ok) await loadBookings();
         return result;
     }
 
@@ -627,19 +629,56 @@
         const result = await request(`/api/bookings/${encodeURIComponent(document.getElementById('booking_action_id').value.trim())}/cancel`, 'POST', {
             reason: 'cancelled from frontend'
         });
-
-        if (result.res.ok) {
-            await loadBookings();
-        }
-
+        if (result.res.ok) await loadBookings();
         return result;
     }
 
+    // ==========================================
+    // PAYMENT FUNCTIONS
+    // ==========================================
     function createPayment() {
         return request('/api/payments', 'POST', {
             booking_id: document.getElementById('payment_booking_id').value.trim(),
             method: document.getElementById('payment_method').value
         });
+    }
+
+    function listPayments() {
+        return request('/api/payments');
+    }
+
+    // ==========================================
+    // USER / AUTH FUNCTIONS
+    // ==========================================
+    async function registerUser() {
+        const result = await request('/api/auth/register', 'POST', {
+            email: document.getElementById('reg_email').value.trim(),
+            password: document.getElementById('reg_password').value,
+            first_name: document.getElementById('reg_first_name').value.trim(),
+            last_name: document.getElementById('reg_last_name').value.trim(),
+            phone: document.getElementById('reg_phone').value.trim()
+        });
+        if (result.res.ok) await loadUsers();
+        return result;
+    }
+
+    function loginUser() {
+        return request('/api/auth/login', 'POST', {
+            email: document.getElementById('login_email').value.trim(),
+            password: document.getElementById('login_password').value
+        });
+    }
+
+    async function createUser() {
+        const result = await request('/api/users', 'POST', {
+            email: document.getElementById('user_email').value.trim(),
+            first_name: document.getElementById('user_first_name').value.trim(),
+            last_name: document.getElementById('user_last_name').value.trim(),
+            phone: document.getElementById('user_phone').value.trim(),
+            role: document.getElementById('user_role').value
+        });
+        if (result.res.ok) await loadUsers();
+        return result;
     }
 
     function logoutUser() {
@@ -689,44 +728,9 @@
         return request('/api/users/batch', 'POST', { ids });
     }
 
-    function sendPushNotification() {
-        return request('/api/notifications/push', 'POST', {
-            user_id: document.getElementById('notif_user_id').value.trim(),
-            title: document.getElementById('notif_title').value.trim(),
-            body: document.getElementById('notif_body').value.trim(),
-            data: document.getElementById('notif_data').value.trim()
-        });
-    }
-
-    function getNotifHistory() {
-        const uid = document.getElementById('notif_history_user').value.trim();
-        return request(`/api/notifications/history?user_id=${encodeURIComponent(uid)}&page=1&page_size=20`);
-    }
-
-    function getUnreadCount() {
-        const uid = document.getElementById('notif_history_user').value.trim();
-        return request(`/api/notifications/unread-count?user_id=${encodeURIComponent(uid)}`);
-    }
-
-    function getNotifPreferences() {
-        const uid = document.getElementById('notif_pref_user').value.trim();
-        return request(`/api/notifications/preferences?user_id=${encodeURIComponent(uid)}`);
-    }
-
-    function updateNotifPreferences() {
-        return request('/api/notifications/preferences', 'PUT', {
-            user_id: document.getElementById('notif_pref_user').value.trim(),
-            email_enabled: document.getElementById('notif_email_enabled').checked,
-            sms_enabled: document.getElementById('notif_sms_enabled').checked,
-            push_enabled: document.getElementById('notif_push_enabled').checked,
-            marketing_emails: document.getElementById('notif_marketing').checked
-        });
-    }
-
-    function listPayments() {
-        return request('/api/payments');
-    }
-
+    // ==========================================
+    // INIT
+    // ==========================================
     async function init() {
         try {
             await Promise.allSettled([
