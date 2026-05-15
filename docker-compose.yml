@@ -53,7 +53,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./services/api-gateway/nginx.conf/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./services/api-gateway/web:/usr/share/nginx/html:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
     ports:
       - "8080:8080"
     depends_on:
