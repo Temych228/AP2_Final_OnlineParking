@@ -244,7 +244,7 @@ func (s *NotificationService) sendSMTP(to, subject, body string) error {
 			"Subject: " + subject + "\r\n" +
 			"Date: " + time.Now().Format(time.RFC1123Z) + "\r\n" +
 			"MIME-Version: 1.0\r\n" +
-			"Content-Type: text/plain; charset=UTF-8\r\n" +
+			"Content-Type: text/html; charset=UTF-8\r\n" +
 			"\r\n" +
 			body + "\r\n",
 	)
@@ -256,6 +256,54 @@ func (s *NotificationService) sendSMTP(to, subject, body string) error {
 	return nil
 }
 
+func emailLayout(accentColor, icon, title, preheader, content string) string {
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>%s</title></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:Arial,sans-serif;">
+  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;padding:40px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+        <!-- Header -->
+        <tr><td style="background:%s;padding:36px 40px;text-align:center;">
+          <div style="font-size:48px;margin-bottom:12px;">%s</div>
+          <h1 style="color:#ffffff;margin:0;font-size:26px;font-weight:700;letter-spacing:-0.5px;">%s</h1>
+        </td></tr>
+        <!-- Body -->
+        <tr><td style="padding:40px;">
+          %s
+        </td></tr>
+        <!-- Footer -->
+        <tr><td style="background:#f4f6f9;padding:24px 40px;text-align:center;border-top:1px solid #e8ecf0;">
+          <p style="margin:0;color:#9ca3af;font-size:13px;">© 2025 Online Parking. All rights reserved.</p>
+          <p style="margin:6px 0 0;color:#9ca3af;font-size:12px;">This is an automated message, please do not reply.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`, preheader, accentColor, icon, title, content)
+}
+
+func btnPrimary(color, link, text string) string {
+	return fmt.Sprintf(`<div style="text-align:center;margin:32px 0;">
+    <a href="%s" style="display:inline-block;background:%s;color:#fff;text-decoration:none;padding:14px 36px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.3px;">%s</a>
+  </div>`, link, color, text)
+}
+
+func infoBox(rows [][2]string) string {
+	var sb strings.Builder
+	sb.WriteString(`<table width="100%%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin:24px 0;">`)
+	for _, row := range rows {
+		fmt.Fprintf(&sb, `<tr>
+      <td style="padding:12px 20px;color:#6b7280;font-size:14px;width:40%%;border-bottom:1px solid #e2e8f0;">%s</td>
+      <td style="padding:12px 20px;color:#111827;font-size:14px;font-weight:600;border-bottom:1px solid #e2e8f0;">%s</td>
+    </tr>`, row[0], row[1])
+	}
+	sb.WriteString(`</table>`)
+	return sb.String()
+}
+
 func (s *NotificationService) handleUserRegistered(ctx context.Context, payload []byte) error {
 	var ev domain.EventUserRegistered
 	if err := jsonUnmarshal(payload, &ev); err != nil {
@@ -263,9 +311,24 @@ func (s *NotificationService) handleUserRegistered(ctx context.Context, payload 
 	}
 
 	link := strings.TrimRight(s.cfg.FrontendURL, "/") + "/verify-email?token=" + ev.VerificationToken
-	subject := "Verify your email"
-	body := fmt.Sprintf("Hello %s,\n\nPlease verify your email using this link:\n%s\n", ev.FirstName, link)
+	subject := "Welcome to Online Parking! Verify your email"
 
+	content := fmt.Sprintf(`
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 16px;">Hi <strong>%s</strong>, welcome aboard! 🎉</p>
+    <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 8px;">Your account has been successfully created. Please verify your email address to get started.</p>
+    %s
+    %s
+    <p style="color:#6b7280;font-size:13px;margin:24px 0 0;">This link expires in 24 hours. If you didn't create this account, you can safely ignore this email.</p>`,
+		ev.FirstName,
+		infoBox([][2]string{
+			{"Full name", ev.FirstName + " " + ev.LastName},
+			{"Email", ev.UserEmail},
+			{"Registered at", time.Now().Format("02 Jan 2006, 15:04")},
+		}),
+		btnPrimary("#4f46e5", link, "Verify Email Address"),
+	)
+
+	body := emailLayout("#4f46e5", "🅿️", "Account Created!", subject, content)
 	_, err := s.createAndDeliver(ctx, ev.UserID, ev.UserEmail, domain.TypeEmail, subject, body, true)
 	return err
 }
@@ -277,9 +340,17 @@ func (s *NotificationService) handlePasswordReset(ctx context.Context, payload [
 	}
 
 	link := strings.TrimRight(s.cfg.FrontendURL, "/") + "/reset-password?token=" + ev.ResetToken
-	subject := "Reset your password"
-	body := fmt.Sprintf("Use this link to reset your password:\n%s\n", link)
+	subject := "Reset your password — Online Parking"
 
+	content := fmt.Sprintf(`
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 16px;">We received a request to reset your password.</p>
+    <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 8px;">Click the button below to create a new password. This link is valid for <strong>1 hour</strong>.</p>
+    %s
+    <p style="color:#6b7280;font-size:13px;margin:24px 0 0;">If you didn't request a password reset, please ignore this email. Your password will remain unchanged.</p>`,
+		btnPrimary("#dc2626", link, "Reset Password"),
+	)
+
+	body := emailLayout("#dc2626", "🔐", "Password Reset", subject, content)
 	_, err := s.createAndDeliver(ctx, ev.UserID, ev.UserEmail, domain.TypeEmail, subject, body, true)
 	return err
 }
@@ -290,9 +361,22 @@ func (s *NotificationService) handleBookingConfirmed(ctx context.Context, payloa
 		return err
 	}
 
-	subject := "Booking confirmed"
-	body := fmt.Sprintf("Booking %s for spot %s is confirmed.", ev.BookingID, ev.SpotID)
+	subject := "Your parking spot is booked!"
 
+	content := fmt.Sprintf(`
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 16px;">Great news! Your parking spot has been <strong>successfully reserved</strong>.</p>
+    %s
+    <p style="color:#6b7280;font-size:13px;margin:24px 0 0;">Please arrive on time. Late arrivals may result in spot reallocation.</p>`,
+		infoBox([][2]string{
+			{"Booking ID", ev.BookingID},
+			{"Spot ID", ev.SpotID},
+			{"Start time", ev.StartsAt.Format("02 Jan 2006, 15:04")},
+			{"End time", ev.EndsAt.Format("02 Jan 2006, 15:04")},
+			{"Status", "Confirmed"},
+		}),
+	)
+
+	body := emailLayout("#059669", "🅿️", "Booking Confirmed", subject, content)
 	_, err := s.createAndDeliver(ctx, ev.UserID, ev.UserEmail, domain.TypeEmail, subject, body, true)
 	return err
 }
@@ -303,9 +387,21 @@ func (s *NotificationService) handlePaymentSuccess(ctx context.Context, payload 
 		return err
 	}
 
-	subject := "Payment successful"
-	body := fmt.Sprintf("Payment for booking %s was successful. Amount: %d %s.", ev.BookingID, ev.Amount, ev.Currency)
+	subject := "Payment successful — Online Parking"
 
+	content := fmt.Sprintf(`
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 16px;">Your payment has been <strong>processed successfully</strong>. Thank you!</p>
+    %s
+    <p style="color:#6b7280;font-size:13px;margin:24px 0 0;">Keep this email as your payment receipt. For questions, contact our support.</p>`,
+		infoBox([][2]string{
+			{"Booking ID", ev.BookingID},
+			{"Amount", fmt.Sprintf("%d %s", ev.Amount, ev.Currency)},
+			{"Date", time.Now().Format("02 Jan 2006, 15:04")},
+			{"Status", "Paid"},
+		}),
+	)
+
+	body := emailLayout("#0284c7", "✅", "Payment Successful", subject, content)
 	_, err := s.createAndDeliver(ctx, ev.UserID, ev.UserEmail, domain.TypeEmail, subject, body, true)
 	return err
 }
@@ -316,9 +412,21 @@ func (s *NotificationService) handleBookingCancelled(ctx context.Context, payloa
 		return err
 	}
 
-	subject := "Booking cancelled"
-	body := fmt.Sprintf("Booking %s was cancelled. Reason: %s", ev.BookingID, ev.Reason)
+	subject := "Your booking has been cancelled — Online Parking"
 
+	content := fmt.Sprintf(`
+    <p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 16px;">Your parking booking has been <strong>cancelled</strong>.</p>
+    %s
+    <p style="color:#6b7280;font-size:13px;margin:24px 0 0;">If you believe this was a mistake or need assistance, please contact our support team.</p>`,
+		infoBox([][2]string{
+			{"Booking ID", ev.BookingID},
+			{"Cancelled at", time.Now().Format("02 Jan 2006, 15:04")},
+			{"Reason", ev.Reason},
+			{"Status", "Cancelled"},
+		}),
+	)
+
+	body := emailLayout("#b45309", "❌", "Booking Cancelled", subject, content)
 	_, err := s.createAndDeliver(ctx, ev.UserID, ev.UserEmail, domain.TypeEmail, subject, body, true)
 	return err
 }

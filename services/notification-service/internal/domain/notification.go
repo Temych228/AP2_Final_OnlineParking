@@ -78,6 +78,7 @@ type EventUserRegistered struct {
 	FirstName         string    `json:"first_name"`
 	VerificationToken string    `json:"verification_token"`
 	OccuredAt         time.Time `json:"occurred_at"`
+	LastName          string    `json:"last_name"`
 }
 
 type EventPasswordReset struct {

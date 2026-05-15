@@ -224,7 +224,11 @@ export default function App() {
     };
 
     const PaymentNotifCard = () => {
-        const refs = { payBkId: useRef(), payMethod: useRef(), notifUid: useRef(), notifTitle: useRef() };
+        const refs = {
+            payBkId: useRef(), payMethod: useRef(),
+            notifUid: useRef(), notifTitle: useRef(),
+            emailTo: useRef(), emailSubject: useRef(), emailBody: useRef(), emailUserId: useRef(),
+        };
         return (
             <div className="card">
                 <h2>Payments & Notifications</h2>
@@ -243,6 +247,32 @@ export default function App() {
                 <input ref={refs.notifUid} list="users_list" placeholder="User ID" />
                 <input ref={refs.notifTitle} placeholder="Message Title" style={{marginTop: '10px'}} />
                 <button className="secondary" onClick={() => request('/api/notifications/push', 'POST', { user_id: refs.notifUid.current.value, title: refs.notifTitle.current.value, body: 'Test push from admin panel' })}>Send Push</button>
+
+                <label style={{marginTop: '16px'}}>📧 Send Email (SMTP)</label>
+                <input ref={refs.emailTo} placeholder="Recipient email (e.g. user@mail.com)" />
+                <input ref={refs.emailUserId} list="users_list" placeholder="User ID (optional)" style={{marginTop: '10px'}} />
+                <select ref={refs.emailSubject} style={{marginTop: '10px'}}>
+                    <option value="Welcome to Online Parking! Your account has been created.">User Created</option>
+                    <option value="Your parking spot has been successfully booked!">🅿Booking Confirmed</option>
+                    <option value="Your payment was processed successfully.">Payment Success</option>
+                    <option value="Your booking has been cancelled.">Booking Cancelled</option>
+                </select>
+                <textarea
+                    ref={refs.emailBody}
+                    placeholder="Email body text..."
+                    defaultValue="Hello! This is an automated notification from Online Parking system."
+                    style={{marginTop: '10px', minHeight: '60px', width: '100%', boxSizing: 'border-box', padding: '8px', borderRadius: '6px', border: '1px solid #ccc', fontFamily: 'inherit', fontSize: '13px'}}
+                />
+                <button
+                    style={{marginTop: '10px', backgroundColor: '#2563eb', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: '600'}}
+                    onClick={() => request('/api/notifications/email', 'POST', {
+                        to: refs.emailTo.current.value,
+                        subject: refs.emailSubject.current.value,
+                        body: refs.emailBody.current.value,
+                        user_id: refs.emailUserId.current.value || '',
+                        type: 'email',
+                    })}
+                >Send Email via SMTP</button>
             </div>
         );
     };
