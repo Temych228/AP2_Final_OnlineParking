@@ -5,14 +5,20 @@ import (
 	"strings"
 
 	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/domain"
-	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/repository"
 )
 
-type ParkingUsecase struct {
-	parkingRepo *repository.ParkingRepository
+type ParkingRepo interface {
+	Create(parking *domain.Parking) error
+	GetByID(id int64) (*domain.Parking, error)
+	GetAll() ([]domain.Parking, error)
+	Delete(id int64) error
 }
 
-func NewParkingUsecase(parkingRepo *repository.ParkingRepository) *ParkingUsecase {
+type ParkingUsecase struct {
+	parkingRepo ParkingRepo
+}
+
+func NewParkingUsecase(parkingRepo ParkingRepo) *ParkingUsecase {
 	return &ParkingUsecase{parkingRepo: parkingRepo}
 }
 
@@ -23,11 +29,9 @@ func (u *ParkingUsecase) CreateParking(name, address string, totalSpots int) (*d
 	if name == "" {
 		return nil, errors.New("parking name is required")
 	}
-
 	if address == "" {
 		return nil, errors.New("parking address is required")
 	}
-
 	if totalSpots <= 0 {
 		return nil, errors.New("total_spots must be greater than zero")
 	}
@@ -37,12 +41,9 @@ func (u *ParkingUsecase) CreateParking(name, address string, totalSpots int) (*d
 		Address:    address,
 		TotalSpots: totalSpots,
 	}
-
-	err := u.parkingRepo.Create(parking)
-	if err != nil {
+	if err := u.parkingRepo.Create(parking); err != nil {
 		return nil, err
 	}
-
 	return parking, nil
 }
 

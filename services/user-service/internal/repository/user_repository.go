@@ -141,39 +141,54 @@ func (r *UserRepository) List(ctx context.Context, page, pageSize int, role stri
 }
 
 func (r *UserRepository) GetBatch(ctx context.Context, ids []string) ([]*domain.User, error) {
-	if len(ids) == 0 {
-		return []*domain.User{}, nil
+	result := make([]*domain.User, 0, len(ids))
+	missing := make([]string, 0)
+
+	for _, id := range ids {
+		if u, err := r.getFromCache(ctx, cacheKeyID+id); err == nil {
+			result = append(result, u)
+		} else {
+			missing = append(missing, id)
+		}
 	}
 
-	placeholders := make([]string, 0, len(ids))
-	args := make([]any, 0, len(ids))
-	for i, id := range ids {
-		placeholders = append(placeholders, fmt.Sprintf("$%d", i+1))
-		args = append(args, strings.TrimSpace(id))
+	if len(missing) == 0 {
+		return result, nil
 	}
 
-	query := fmt.Sprintf(`
-		SELECT id, email, first_name, last_name, phone, role, is_verified, is_banned, COALESCE(ban_reason, ''), created_at, updated_at
-		FROM users
-		WHERE deleted_at IS NULL AND id IN (%s)
-	`, strings.Join(placeholders, ","))
+	placeholders := make([]string, len(missing))
+	args := make([]interface{}, len(missing))
+	for i, id := range missing {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(
+		`SELECT id, email, first_name, last_name, phone, role, is_verified, is_banned, ban_reason, created_at, updated_at
+		 FROM users WHERE id = ANY(ARRAY[%s]::uuid[])`,
+		strings.Join(placeholders, ","),
+	)
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("get batch users: %w", err)
+		return nil, err
 	}
 	defer rows.Close()
 
-	users := make([]*domain.User, 0)
 	for rows.Next() {
-		user, err := scanUser(rows)
-		if err != nil {
+		var u domain.User
+		if err := rows.Scan(
+			&u.ID, &u.Email, &u.FirstName, &u.LastName, &u.Phone,
+			&u.Role, &u.IsVerified, &u.IsBanned, &u.BanReason,
+			&u.CreatedAt, &u.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
-		users = append(users, user)
+		r.setCache(ctx, &u)
+		result = append(result, &u)
 	}
 
-	return users, rows.Err()
+	return result, rows.Err()
 }
 
 func (r *UserRepository) CheckExists(ctx context.Context, email string) (bool, string, error) {

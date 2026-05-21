@@ -60,14 +60,7 @@ func (a *App) Run() error {
 	userIntegration := integration.NewUserIntegration(a.cfg.UserServiceURL)
 	natsPublisher := publisher.NewNATSPublisher(a.nc)
 
-	paymentService := service.NewPaymentService(
-		repo,
-		bookingIntegration,
-		parkingIntegration,
-		userIntegration,
-		natsPublisher,
-	)
-	paymentService.SetCache(a.cache)
+	paymentService := service.NewPaymentServiceFull(repo, bookingIntegration, parkingIntegration, userIntegration, natsPublisher, a.cache)
 
 	router := gin.Default()
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))

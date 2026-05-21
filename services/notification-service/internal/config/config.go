@@ -18,7 +18,8 @@ type Config struct {
 	RedisPassword string
 	RedisDB       int
 
-	NATSUrl string
+	NATSUrl    string
+	NumWorkers int
 
 	SMTPHost     string
 	SMTPPort     int
@@ -40,6 +41,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("invalid SMTP_PORT: %w", err)
 	}
 
+	numWorkers, err := strconv.Atoi(getEnv("NATS_NUM_WORKERS", "5"))
+	if err != nil || numWorkers <= 0 {
+		numWorkers = 5
+	}
+
 	return &Config{
 		HTTPPort:      getEnv("HTTP_PORT", "8083"),
 		GRPCPort:      getEnv("GRPC_PORT", "9093"),
@@ -50,6 +56,7 @@ func Load() (*Config, error) {
 		RedisPassword: getEnv("REDIS_PASSWORD", ""),
 		RedisDB:       redisDB,
 		NATSUrl:       getEnv("NATS_URL", "nats://localhost:4222"),
+		NumWorkers:    numWorkers,
 		SMTPHost:      getEnv("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:      smtpPort,
 		SMTPUsername:  getEnv("SMTP_USERNAME", ""),
@@ -66,18 +73,7 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func (c *Config) HTTPAddress() string {
-	return fmt.Sprintf(":%s", c.HTTPPort)
-}
-
-func (c *Config) GRPCAddress() string {
-	return fmt.Sprintf(":%s", c.GRPCPort)
-}
-
-func (c *Config) MetricsAddress() string {
-	return fmt.Sprintf(":%s", c.MetricsPort)
-}
-
-func (c *Config) RedisAddr() string {
-	return fmt.Sprintf("%s:%s", c.RedisHost, c.RedisPort)
-}
+func (c *Config) HTTPAddress() string    { return fmt.Sprintf(":%s", c.HTTPPort) }
+func (c *Config) GRPCAddress() string    { return fmt.Sprintf(":%s", c.GRPCPort) }
+func (c *Config) MetricsAddress() string { return fmt.Sprintf(":%s", c.MetricsPort) }
+func (c *Config) RedisAddr() string      { return fmt.Sprintf("%s:%s", c.RedisHost, c.RedisPort) }

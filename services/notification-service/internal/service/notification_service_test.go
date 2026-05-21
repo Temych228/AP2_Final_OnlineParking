@@ -316,3 +316,271 @@ func mustJSON(t *testing.T, v any) *bytes.Reader {
 	}
 	return bytes.NewReader(data)
 }
+
+func TestNotificationService_HandleEvent_AllSubjects(t *testing.T) {
+	svc, _ := newNotificationService()
+	ctx := context.Background()
+
+	t.Run("booking_confirmed", func(t *testing.T) {
+		payload, _ := json.Marshal(domain.EventBookingConfirmed{
+			EventID:   "ev-bc-1",
+			UserID:    "user-10",
+			UserEmail: "user10@mail.com",
+			BookingID: "book-1",
+			SpotID:    "spot-1",
+			StartsAt:  time.Now().UTC(),
+			EndsAt:    time.Now().Add(2 * time.Hour).UTC(),
+			OccuredAt: time.Now().UTC(),
+		})
+		if err := svc.HandleEvent(ctx, domain.SubjectBookingConfirmed, payload); err != nil {
+			t.Fatalf("booking_confirmed: %v", err)
+		}
+		if err := svc.HandleEvent(ctx, domain.SubjectBookingConfirmed, payload); err != nil {
+			t.Fatalf("booking_confirmed dedupe: %v", err)
+		}
+	})
+
+	t.Run("payment_success", func(t *testing.T) {
+		payload, _ := json.Marshal(domain.EventPaymentSuccess{
+			EventID:   "ev-ps-1",
+			UserID:    "user-11",
+			UserEmail: "user11@mail.com",
+			BookingID: "book-2",
+			Amount:    5000,
+			Currency:  "KZT",
+			OccuredAt: time.Now().UTC(),
+		})
+		if err := svc.HandleEvent(ctx, domain.SubjectPaymentSuccess, payload); err != nil {
+			t.Fatalf("payment_success: %v", err)
+		}
+	})
+
+	t.Run("booking_cancelled", func(t *testing.T) {
+		payload, _ := json.Marshal(domain.EventBookingCancelled{
+			EventID:   "ev-bcancel-1",
+			UserID:    "user-12",
+			UserEmail: "user12@mail.com",
+			BookingID: "book-3",
+			Reason:    "user request",
+			OccuredAt: time.Now().UTC(),
+		})
+		if err := svc.HandleEvent(ctx, domain.SubjectBookingCancelled, payload); err != nil {
+			t.Fatalf("booking_cancelled: %v", err)
+		}
+	})
+
+	t.Run("password_reset", func(t *testing.T) {
+		payload, _ := json.Marshal(domain.EventPasswordReset{
+			EventID:    "ev-pr-1",
+			UserID:     "user-13",
+			UserEmail:  "user13@mail.com",
+			ResetToken: "reset-token-abc",
+			OccuredAt:  time.Now().UTC(),
+		})
+		if err := svc.HandleEvent(ctx, domain.SubjectPasswordReset, payload); err != nil {
+			t.Fatalf("password_reset: %v", err)
+		}
+	})
+
+	t.Run("unknown_subject", func(t *testing.T) {
+		if err := svc.HandleEvent(ctx, "parking.unknown.event", []byte(`{}`)); err != nil {
+			t.Fatalf("unknown subject should not return error: %v", err)
+		}
+	})
+
+	t.Run("invalid_json_booking_confirmed", func(t *testing.T) {
+		err := svc.HandleEvent(ctx, domain.SubjectBookingConfirmed, []byte(`not-json`))
+		if err == nil {
+			t.Fatal("expected error on invalid JSON")
+		}
+	})
+
+	t.Run("invalid_json_payment_success", func(t *testing.T) {
+		err := svc.HandleEvent(ctx, domain.SubjectPaymentSuccess, []byte(`{bad}`))
+		if err == nil {
+			t.Fatal("expected error on invalid JSON for payment_success")
+		}
+	})
+
+	t.Run("invalid_json_booking_cancelled", func(t *testing.T) {
+		err := svc.HandleEvent(ctx, domain.SubjectBookingCancelled, []byte(`{bad}`))
+		if err == nil {
+			t.Fatal("expected error on invalid JSON for booking_cancelled")
+		}
+	})
+
+	t.Run("invalid_json_password_reset", func(t *testing.T) {
+		err := svc.HandleEvent(ctx, domain.SubjectPasswordReset, []byte(`{bad}`))
+		if err == nil {
+			t.Fatal("expected error on invalid JSON for password_reset")
+		}
+	})
+
+	t.Run("invalid_json_user_registered", func(t *testing.T) {
+		err := svc.HandleEvent(ctx, domain.SubjectUserRegistered, []byte(`{bad}`))
+		if err == nil {
+			t.Fatal("expected error on invalid JSON for user_registered")
+		}
+	})
+}
+
+func TestNotificationService_Hub(t *testing.T) {
+	hub := service.NewHub()
+	ctx := context.Background()
+	_ = ctx
+
+	ch1 := hub.Subscribe("user-hub-1")
+	ch2 := hub.Subscribe("user-hub-1")
+
+	n := &domain.Notification{
+		ID:      "hub-notif-1",
+		UserID:  "user-hub-1",
+		Type:    domain.TypePush,
+		Subject: "test",
+		Body:    "body",
+		Status:  domain.StatusSent,
+	}
+
+	hub.Broadcast(n)
+
+	select {
+	case got := <-ch1:
+		if got.ID != n.ID {
+			t.Fatalf("ch1 got wrong notification: %+v", got)
+		}
+	default:
+		t.Fatal("ch1 did not receive broadcast")
+	}
+
+	select {
+	case got := <-ch2:
+		if got.ID != n.ID {
+			t.Fatalf("ch2 got wrong notification: %+v", got)
+		}
+	default:
+		t.Fatal("ch2 did not receive broadcast")
+	}
+
+	hub.Broadcast(nil)
+
+	hub.Unsubscribe("user-hub-1", ch1)
+	hub.Unsubscribe("user-hub-1", ch2)
+
+	hub.Broadcast(n)
+
+	hub.Unsubscribe("nonexistent-user", ch1)
+}
+
+func TestNotificationService_SendBulkEmail(t *testing.T) {
+	svc, _ := newNotificationService()
+	ctx := context.Background()
+
+	sent, failed, err := svc.SendBulkEmail(ctx,
+		[]string{"a@mail.com", "b@mail.com", "c@mail.com"},
+		"Bulk Subject",
+		"Bulk Body",
+		string(domain.TypeEmail),
+	)
+	if err != nil {
+		t.Fatalf("SendBulkEmail unexpected error: %v", err)
+	}
+	if sent+failed != 3 {
+		t.Fatalf("expected sent+failed=3, got sent=%d failed=%d", sent, failed)
+	}
+}
+
+func TestNotificationService_DeleteNotification(t *testing.T) {
+	svc, repo := newNotificationService()
+	ctx := context.Background()
+
+	n, err := svc.SendPush(ctx, "user-del-1", "Del Title", "Del Body", "")
+	if err != nil {
+		t.Fatalf("SendPush: %v", err)
+	}
+
+	if err := svc.DeleteNotification(ctx, n.ID, "user-del-1"); err != nil {
+		t.Fatalf("DeleteNotification: %v", err)
+	}
+
+	items, total, err := svc.GetNotificationHistory(ctx, "user-del-1", 1, 20)
+	if err != nil {
+		t.Fatalf("GetNotificationHistory after delete: %v", err)
+	}
+	if total != 0 || len(items) != 0 {
+		t.Fatalf("expected 0 after delete, got total=%d", total)
+	}
+
+	if err := svc.DeleteNotification(ctx, "nonexistent", "user-del-1"); err == nil {
+		t.Fatal("expected error deleting nonexistent")
+	}
+
+	_ = repo
+}
+
+func TestNotificationService_GetTemplate_AllTemplates(t *testing.T) {
+	svc, _ := newNotificationService()
+
+	templates := []string{
+		"booking_confirmed",
+		"payment_success",
+		"booking_cancelled",
+		"verification_email",
+		"password_reset",
+		"unknown_template",
+	}
+
+	for _, name := range templates {
+		subject, body := svc.GetTemplate(name)
+		switch name {
+		case "unknown_template":
+			if subject != "" || body != "" {
+				t.Fatalf("expected empty template for unknown, got subject=%q body=%q", subject, body)
+			}
+		default:
+			if subject == "" || body == "" {
+				t.Fatalf("expected non-empty template for %q", name)
+			}
+		}
+	}
+}
+
+func TestNotificationService_SubscribeUnsubscribe(t *testing.T) {
+	svc, _ := newNotificationService()
+
+	ch := svc.Subscribe("sub-user-1")
+	if ch == nil {
+		t.Fatal("expected non-nil channel from Subscribe")
+	}
+
+	svc.Unsubscribe("sub-user-1", ch)
+	svc.Unsubscribe("nonexistent-user", ch)
+}
+
+func TestNotificationService_MarkRead_NotFound(t *testing.T) {
+	svc, _ := newNotificationService()
+	ctx := context.Background()
+
+	err := svc.MarkNotificationRead(ctx, "does-not-exist", "some-user")
+	if err == nil {
+		t.Fatal("expected error marking nonexistent notification as read")
+	}
+}
+
+func TestNotificationService_History_Pagination(t *testing.T) {
+	svc, _ := newNotificationService()
+	ctx := context.Background()
+
+	for i := 0; i < 5; i++ {
+		if _, err := svc.SendPush(ctx, "user-page-1", fmt.Sprintf("Title %d", i), "body", ""); err != nil {
+			t.Fatalf("SendPush %d: %v", i, err)
+		}
+	}
+
+	items, total, err := svc.GetNotificationHistory(ctx, "user-page-1", 1, 20)
+	if err != nil {
+		t.Fatalf("GetNotificationHistory: %v", err)
+	}
+	if total != 5 || len(items) != 5 {
+		t.Fatalf("expected 5 items, got total=%d len=%d", total, len(items))
+	}
+}

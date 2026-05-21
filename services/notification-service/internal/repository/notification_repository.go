@@ -126,6 +126,17 @@ func (r *NotificationRepository) UnreadCount(ctx context.Context, userID string)
 }
 
 func (r *NotificationRepository) GetPreferences(ctx context.Context, userID string) (*domain.Preferences, error) {
+	if r.cache != nil {
+		key := "notif:prefs:" + strings.TrimSpace(userID)
+		data, err := r.cache.Get(ctx, key).Bytes()
+		if err == nil {
+			var p domain.Preferences
+			if json.Unmarshal(data, &p) == nil {
+				return &p, nil
+			}
+		}
+	}
+
 	row := r.db.QueryRow(ctx, `
 		SELECT user_id, email_enabled, sms_enabled, push_enabled, marketing_emails
 		FROM notification_preferences
@@ -136,17 +147,20 @@ func (r *NotificationRepository) GetPreferences(ctx context.Context, userID stri
 	err := row.Scan(&p.UserID, &p.EmailEnabled, &p.SMSEnabled, &p.PushEnabled, &p.MarketingEmail)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return &domain.Preferences{
+			p = domain.Preferences{
 				UserID:         userID,
 				EmailEnabled:   true,
 				SMSEnabled:     false,
 				PushEnabled:    true,
 				MarketingEmail: false,
-			}, nil
+			}
+			r.setPrefsCache(ctx, &p)
+			return &p, nil
 		}
 		return nil, err
 	}
 
+	r.setPrefsCache(ctx, &p)
 	return &p, nil
 }
 
@@ -161,7 +175,27 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, p *domai
 			marketing_emails = EXCLUDED.marketing_emails,
 			updated_at = NOW()
 	`, p.UserID, p.EmailEnabled, p.SMSEnabled, p.PushEnabled, p.MarketingEmail)
-	return err
+	if err != nil {
+		return err
+	}
+	if r.cache != nil {
+		key := "notif:prefs:" + strings.TrimSpace(p.UserID)
+		if data, merr := json.Marshal(p); merr == nil {
+			_ = r.cache.Set(ctx, key, data, 5*time.Minute).Err()
+		}
+		_ = r.cache.Del(ctx, "notif:unread:"+strings.TrimSpace(p.UserID)).Err()
+	}
+	return nil
+}
+
+func (r *NotificationRepository) setPrefsCache(ctx context.Context, p *domain.Preferences) {
+	if r.cache == nil || p == nil {
+		return
+	}
+	key := "notif:prefs:" + strings.TrimSpace(p.UserID)
+	if data, err := json.Marshal(p); err == nil {
+		_ = r.cache.Set(ctx, key, data, 5*time.Minute).Err()
+	}
 }
 
 func (r *NotificationRepository) MarkEventProcessed(ctx context.Context, eventID string, ttl time.Duration) (bool, error) {

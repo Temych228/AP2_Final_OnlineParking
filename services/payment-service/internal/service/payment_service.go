@@ -16,8 +16,18 @@ import (
 	"github.com/Temych228/AP2_Final_OnlineParking/services/payment-service/internal/repository"
 )
 
+type PaymentRepo interface {
+	Create(ctx context.Context, p *domain.Payment) error
+	GetByID(ctx context.Context, id string) (*domain.Payment, error)
+	GetByBookingID(ctx context.Context, bookingID string) (*domain.Payment, error)
+	List(ctx context.Context, filter domain.ListPaymentsFilter) ([]domain.Payment, error)
+	MarkPaid(ctx context.Context, id, providerPaymentID string) (*domain.Payment, error)
+	Cancel(ctx context.Context, id string) (*domain.Payment, error)
+	HasPaidPaymentForBooking(ctx context.Context, bookingID string) (bool, error)
+}
+
 type PaymentService struct {
-	repo               *repository.PaymentRepository
+	repo               PaymentRepo // было: *repository.PaymentRepository
 	bookingIntegration *integration.BookingIntegration
 	parkingIntegration *integration.ParkingIntegration
 	userIntegration    *integration.UserIntegration
@@ -30,14 +40,30 @@ func NewPaymentService(
 	bookingIntegration *integration.BookingIntegration,
 	parkingIntegration *integration.ParkingIntegration,
 	userIntegration *integration.UserIntegration,
-	publisher *publisher.NATSPublisher,
+	pub *publisher.NATSPublisher,
 ) *PaymentService {
 	return &PaymentService{
 		repo:               repo,
 		bookingIntegration: bookingIntegration,
 		parkingIntegration: parkingIntegration,
 		userIntegration:    userIntegration,
-		publisher:          publisher,
+		publisher:          pub,
+	}
+}
+
+func NewPaymentServiceWithRepo(
+	repo PaymentRepo,
+	bookingIntegration *integration.BookingIntegration,
+	parkingIntegration *integration.ParkingIntegration,
+	userIntegration *integration.UserIntegration,
+	pub *publisher.NATSPublisher,
+) *PaymentService {
+	return &PaymentService{
+		repo:               repo,
+		bookingIntegration: bookingIntegration,
+		parkingIntegration: parkingIntegration,
+		userIntegration:    userIntegration,
+		publisher:          pub,
 	}
 }
 
@@ -101,7 +127,6 @@ func (s *PaymentService) CreatePayment(ctx context.Context, input domain.CreateP
 	}
 
 	now := time.Now().UTC()
-
 	payment := &domain.Payment{
 		ID:        uuid.NewString(),
 		BookingID: booking.ID,
@@ -121,7 +146,6 @@ func (s *PaymentService) CreatePayment(ctx context.Context, input domain.CreateP
 	}
 
 	providerPaymentID := "local-" + uuid.NewString()
-
 	paidPayment, err := s.repo.MarkPaid(ctx, payment.ID, providerPaymentID)
 	if err != nil {
 		return nil, err
@@ -173,4 +197,22 @@ func (s *PaymentService) CancelPayment(ctx context.Context, id string) (*domain.
 	}
 
 	return s.repo.Cancel(ctx, id)
+}
+
+func NewPaymentServiceFull(
+	repo PaymentRepo,
+	bookingIntegration *integration.BookingIntegration,
+	parkingIntegration *integration.ParkingIntegration,
+	userIntegration *integration.UserIntegration,
+	pub *publisher.NATSPublisher,
+	cache *redis.Client,
+) *PaymentService {
+	return &PaymentService{
+		repo:               repo,
+		bookingIntegration: bookingIntegration,
+		parkingIntegration: parkingIntegration,
+		userIntegration:    userIntegration,
+		publisher:          pub,
+		cache:              cache,
+	}
 }

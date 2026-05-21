@@ -2,9 +2,11 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/Temych228/AP2_Final_OnlineParking/services/notification-service/internal/config"
@@ -20,6 +22,11 @@ import (
 	"google.golang.org/grpc"
 )
 
+type eventJob struct {
+	subject string
+	data    []byte
+}
+
 type App struct {
 	cfg *config.Config
 
@@ -34,6 +41,9 @@ type App struct {
 	metricsServer *http.Server
 
 	svc *service.NotificationService
+
+	jobs        chan eventJob
+	workersDone sync.WaitGroup
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -43,7 +53,6 @@ func New(cfg *config.Config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if err := db.Ping(ctx); err != nil {
 		db.Close()
 		return nil, err
@@ -54,7 +63,6 @@ func New(cfg *config.Config) (*App, error) {
 		Password: cfg.RedisPassword,
 		DB:       cfg.RedisDB,
 	})
-
 	if err := cache.Ping(ctx).Err(); err != nil {
 		db.Close()
 		_ = cache.Close()
@@ -82,11 +90,17 @@ func New(cfg *config.Config) (*App, error) {
 		Addr:    cfg.HTTPAddress(),
 		Handler: httpMux,
 	}
-
 	metricsServer := &http.Server{
 		Addr:    cfg.MetricsAddress(),
 		Handler: promhttp.Handler(),
 	}
+
+	numWorkers := cfg.NumWorkers
+	if numWorkers <= 0 {
+		numWorkers = 5
+	}
+
+	jobs := make(chan eventJob, numWorkers*64)
 
 	app := &App{
 		cfg:           cfg,
@@ -97,9 +111,13 @@ func New(cfg *config.Config) (*App, error) {
 		httpServer:    httpServer,
 		metricsServer: metricsServer,
 		svc:           svc,
+		jobs:          jobs,
 	}
 
+	app.startWorkers(numWorkers)
+
 	if err := app.subscribeNATS(); err != nil {
+		close(jobs)
 		nc.Close()
 		db.Close()
 		_ = cache.Close()
@@ -107,6 +125,35 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	return app, nil
+}
+
+func (a *App) startWorkers(n int) {
+	log.Printf("[nats-workers] starting %d workers", n)
+	for i := 0; i < n; i++ {
+		a.workersDone.Add(1)
+		go a.runWorker(i)
+	}
+}
+
+func (a *App) runWorker(id int) {
+	defer a.workersDone.Done()
+	log.Printf("[worker-%d] started, listening for events", id)
+
+	for job := range a.jobs {
+		start := time.Now()
+		log.Printf("[worker-%d] START subject=%s payload_bytes=%d", id, job.subject, len(job.data))
+
+		err := a.svc.HandleEvent(context.Background(), job.subject, job.data)
+		elapsed := time.Since(start)
+
+		if err != nil {
+			log.Printf("[worker-%d] ERROR subject=%s duration=%s err=%v", id, job.subject, elapsed, err)
+		} else {
+			log.Printf("[worker-%d] OK    subject=%s duration=%s", id, job.subject, elapsed)
+		}
+	}
+
+	log.Printf("[worker-%d] stopped (channel closed)", id)
 }
 
 func (a *App) subscribeNATS() error {
@@ -119,13 +166,21 @@ func (a *App) subscribeNATS() error {
 	}
 
 	for _, subject := range subjects {
-		if _, err := a.nats.Subscribe(subject, func(msg *nats.Msg) {
-			if err := a.svc.HandleEvent(context.Background(), msg.Subject, msg.Data); err != nil {
-				log.Printf("nats handler error subject=%s err=%v", msg.Subject, err)
+		sub := subject // захват переменной для замыкания
+		_, err := a.nats.QueueSubscribe(sub, "notification-workers", func(msg *nats.Msg) {
+			job := eventJob{subject: msg.Subject, data: msg.Data}
+			select {
+			case a.jobs <- job:
+				log.Printf("[nats] enqueued subject=%s queue_len=%d", msg.Subject, len(a.jobs))
+			default:
+				log.Printf("[nats] WARNING: job queue full (%d/%d), dropping subject=%s",
+					len(a.jobs), cap(a.jobs), msg.Subject)
 			}
-		}); err != nil {
-			return err
+		})
+		if err != nil {
+			return fmt.Errorf("subscribe %s: %w", sub, err)
 		}
+		log.Printf("[nats] subscribed subject=%s queue=notification-workers", sub)
 	}
 
 	return a.nats.Flush()
@@ -156,27 +211,37 @@ func (a *App) Run(ctx context.Context) error {
 			log.Printf("grpc server stopped: %v", err)
 		}
 	}()
-
 	go func() {
 		if err := a.httpServer.Serve(httpLis); err != nil && err != http.ErrServerClosed {
 			log.Printf("http server stopped: %v", err)
 		}
 	}()
-
 	go func() {
 		if err := a.metricsServer.Serve(metricsLis); err != nil && err != http.ErrServerClosed {
 			log.Printf("metrics server stopped: %v", err)
 		}
 	}()
 
-	log.Printf("notification-service started on %s, grpc on %s, metrics on %s",
-		a.cfg.HTTPAddress(), a.cfg.GRPCAddress(), a.cfg.MetricsAddress())
+	log.Printf("notification-service started http=%s grpc=%s metrics=%s workers=%d",
+		a.cfg.HTTPAddress(), a.cfg.GRPCAddress(), a.cfg.MetricsAddress(), a.cfg.NumWorkers)
 	return nil
 }
 
 func (a *App) Shutdown(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
+
+	if a.nats != nil {
+		log.Printf("[shutdown] draining NATS subscriptions...")
+		_ = a.nats.Drain()
+	}
+
+	if a.jobs != nil {
+		close(a.jobs)
+		log.Printf("[shutdown] waiting for workers to finish...")
+		a.workersDone.Wait()
+		log.Printf("[shutdown] all workers done")
+	}
 
 	if a.httpServer != nil {
 		_ = a.httpServer.Shutdown(shutdownCtx)
@@ -190,6 +255,7 @@ func (a *App) Shutdown(ctx context.Context) error {
 	if a.grpcListener != nil {
 		_ = a.grpcListener.Close()
 	}
+
 	if a.nats != nil {
 		a.nats.Close()
 	}

@@ -248,7 +248,7 @@ export default function App() {
                 <input ref={refs.notifTitle} placeholder="Message Title" style={{marginTop: '10px'}} />
                 <button className="secondary" onClick={() => request('/api/notifications/push', 'POST', { user_id: refs.notifUid.current.value, title: refs.notifTitle.current.value, body: 'Test push from admin panel' })}>Send Push</button>
 
-                <label style={{marginTop: '16px'}}>📧 Send Email (SMTP)</label>
+                <label style={{marginTop: '16px'}}>Send Email (SMTP)</label>
                 <input ref={refs.emailTo} placeholder="Recipient email (e.g. user@mail.com)" />
                 <input ref={refs.emailUserId} list="users_list" placeholder="User ID (optional)" style={{marginTop: '10px'}} />
                 <select ref={refs.emailSubject} style={{marginTop: '10px'}}>

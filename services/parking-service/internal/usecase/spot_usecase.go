@@ -5,22 +5,24 @@ import (
 	"strings"
 
 	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/domain"
-	"github.com/Temych228/AP2_Final_OnlineParking/services/parking-service/internal/repository"
 )
 
-type SpotUsecase struct {
-	spotRepo    *repository.SpotRepository
-	parkingRepo *repository.ParkingRepository
+type SpotRepo interface {
+	Create(spot *domain.Spot) error
+	GetByID(id int64) (*domain.Spot, error)
+	GetByParkingID(parkingID int64) ([]domain.Spot, error)
+	UpdateStatus(id int64, status domain.SpotStatus) error
+	Delete(id int64) error
+	CountByParkingID(parkingID int64) (int, error)
 }
 
-func NewSpotUsecase(
-	spotRepo *repository.SpotRepository,
-	parkingRepo *repository.ParkingRepository,
-) *SpotUsecase {
-	return &SpotUsecase{
-		spotRepo:    spotRepo,
-		parkingRepo: parkingRepo,
-	}
+type SpotUsecase struct {
+	spotRepo    SpotRepo
+	parkingRepo ParkingRepo
+}
+
+func NewSpotUsecase(spotRepo SpotRepo, parkingRepo ParkingRepo) *SpotUsecase {
+	return &SpotUsecase{spotRepo: spotRepo, parkingRepo: parkingRepo}
 }
 
 func (u *SpotUsecase) CreateSpot(parkingID int64, number string) (*domain.Spot, error) {
@@ -29,7 +31,6 @@ func (u *SpotUsecase) CreateSpot(parkingID int64, number string) (*domain.Spot, 
 	if parkingID <= 0 {
 		return nil, errors.New("parking_id is required")
 	}
-
 	if number == "" {
 		return nil, errors.New("spot number is required")
 	}
@@ -43,7 +44,6 @@ func (u *SpotUsecase) CreateSpot(parkingID int64, number string) (*domain.Spot, 
 	if err != nil {
 		return nil, err
 	}
-
 	if currentCount >= parking.TotalSpots {
 		return nil, errors.New("parking spot limit reached")
 	}
@@ -53,12 +53,9 @@ func (u *SpotUsecase) CreateSpot(parkingID int64, number string) (*domain.Spot, 
 		Number:    number,
 		Status:    domain.StatusAvailable,
 	}
-
-	err = u.spotRepo.Create(spot)
-	if err != nil {
+	if err := u.spotRepo.Create(spot); err != nil {
 		return nil, err
 	}
-
 	return spot, nil
 }
 
@@ -75,7 +72,6 @@ func (u *SpotUsecase) CheckAvailability(spotID int64) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-
 	return spot.Status == domain.StatusAvailable, nil
 }
 
@@ -84,11 +80,9 @@ func (u *SpotUsecase) ReserveSpot(spotID int64) error {
 	if err != nil {
 		return err
 	}
-
 	if spot.Status != domain.StatusAvailable {
 		return errors.New("spot is not available")
 	}
-
 	return u.spotRepo.UpdateStatus(spotID, domain.StatusReserved)
 }
 
@@ -97,11 +91,9 @@ func (u *SpotUsecase) ReleaseSpot(spotID int64) error {
 	if err != nil {
 		return err
 	}
-
 	if spot.Status != domain.StatusReserved {
 		return errors.New("spot is not reserved")
 	}
-
 	return u.spotRepo.UpdateStatus(spotID, domain.StatusAvailable)
 }
 

@@ -376,7 +376,7 @@ func (s *NotificationService) handleBookingConfirmed(ctx context.Context, payloa
 		}),
 	)
 
-	body := emailLayout("#059669", "🅿️", "Booking Confirmed", subject, content)
+	body := emailLayout("#059669", "", "Booking Confirmed", subject, content)
 	_, err := s.createAndDeliver(ctx, ev.UserID, ev.UserEmail, domain.TypeEmail, subject, body, true)
 	return err
 }
